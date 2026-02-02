@@ -6,12 +6,46 @@ const prisma = new PrismaClient();
 
 // GET 请求用于 cron-job.org 调用 (按用户 API Key 验证)
 export async function GET(request: Request) {
+    // 检查是否为系统级 Cron 调用 (Bear Token)
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+
+    // 如果有 CRON_SECRET 且匹配，执行全站更新
+    if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+        try {
+            // 获取所有开启了邮件通知或者只是注册了的用户
+            // updateArticlesForUser 内部会处理邮件发送，所以这里只需要遍历用户
+            const users = await prisma.user.findMany({
+                select: { id: true }
+            });
+
+            console.log(`Starting system-wide update for ${users.length} users...`);
+
+            // 串行或并发处理所有用户
+            let updatedCount = 0;
+            for (const user of users) {
+                try {
+                    await updateArticlesForUser(user.id);
+                    updatedCount++;
+                } catch (uError) {
+                    console.error(`Failed to update for user ${user.id}`, uError);
+                }
+            }
+
+            return NextResponse.json({ success: true, mode: 'system', usersProcessed: updatedCount });
+        } catch (error) {
+            console.error('System update failed', error);
+            return NextResponse.json({ error: 'System update failed' }, { status: 500 });
+        }
+    }
+
+    // 个人用户 API Key 验证模式
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const apiKey = searchParams.get('apiKey');
 
     if (!userId || !apiKey) {
-        return NextResponse.json({ error: 'Missing userId or apiKey' }, { status: 400 });
+        return NextResponse.json({ error: 'Missing userId or apiKey, and invalid CRON_SECRET' }, { status: 401 });
     }
 
     // 验证 API Key
