@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Journal {
+  id         Int       @id @default(autoincrement())
+  title      String
+  printIssn  String?   // Make optional as some might not have both
+  eIssn      String?
+  ajgRanking String?
+  isFt50     Boolean   @default(false)
+  isUtd24    Boolean   @default(false)
+  isFollowed Boolean   @default(false)
+  articles   Article[]
+}
+
+model Article {
+  id              Int      @id @default(autoincrement())
+  doi             String   @unique
+  title           String
+  authors         String? // Stored as JSON string or comma separated
+  abstract        String?
+  publicationDate DateTime?
+  url             String?
+  journalId       Int
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  
+  journal         Journal  @relation(fields: [journalId], references: [id])
+}
+
+model Settings {
+  id             Int     @id @default(autoincrement())
+  emailEnabled   Boolean @default(false)
+  targetEmail    String?
+  smtpConfig     String? // JSON string for host, port, user, pass
+  lastCheckTime  DateTime?
+}
