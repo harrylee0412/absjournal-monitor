@@ -15,20 +15,21 @@ export async function GET(request: Request) {
         try {
             // 获取所有开启了邮件通知或者只是注册了的用户(从 UserSettings 表获取)
             // updateArticlesForUser 内部会处理邮件发送，所以这里只需要遍历用户
-            const users = await prisma.userSettings.findMany({
+            // Explicitly selecting userId from UserSettings as User model might not exist
+            const allSettings = await prisma.userSettings.findMany({
                 select: { userId: true }
             });
 
-            console.log(`Starting system-wide update for ${users.length} users...`);
+            console.log(`Starting system-wide update for ${allSettings.length} users...`);
 
             // 串行或并发处理所有用户
             let updatedCount = 0;
-            for (const user of users) {
+            for (const setting of allSettings) {
                 try {
-                    await updateArticlesForUser(user.userId);
+                    await updateArticlesForUser(setting.userId);
                     updatedCount++;
                 } catch (uError) {
-                    console.error(`Failed to update for user ${user.userId}`, uError);
+                    console.error(`Failed to update for user ${setting.userId}`, uError);
                 }
             }
 
