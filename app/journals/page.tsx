@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Info } from 'lucide-react';
 import axios from 'axios';
 
 interface Journal {
@@ -59,6 +59,11 @@ export default function JournalsPage() {
             await axios.post(`/api/journals/${id}/follow`, { isFollowed: !currentStatus });
         } catch (e) {
             console.error("Failed to toggle follow", e);
+            if (axios.isAxiosError(e) && e.response?.data?.error) {
+                alert(e.response.data.error);
+            } else {
+                alert("Operation failed. Please try again.");
+            }
             // Revert
             setJournals(prev => prev.map(j => j.id === id ? { ...j, isFollowed: currentStatus } : j));
         }
@@ -67,7 +72,13 @@ export default function JournalsPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h1 className="text-3xl font-bold tracking-tight">Journals</h1>
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Journals</h1>
+                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                        <Info className="w-4 h-4" />
+                        You can follow up to 30 journals.
+                    </p>
+                </div>
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
@@ -169,8 +180,8 @@ export default function JournalsPage() {
                                 <button
                                     onClick={() => toggleFollow(journal.id, journal.isFollowed)}
                                     className={`w-full inline-flex justify-center items-center px-4 py-2 border text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${journal.isFollowed
-                                            ? 'border-transparent text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                                            : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary'
+                                        ? 'border-transparent text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary'
                                         }`}
                                 >
                                     {journal.isFollowed ? 'Unfollow' : 'Follow'}

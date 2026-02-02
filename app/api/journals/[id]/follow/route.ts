@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth/server';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
@@ -7,24 +9,42 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    // In Next.js 15+, params is a Promise, better to await it. 
-    // However, older Next 14 is sync or async dependent on precise version.
-    // The user install was 'latest' which is 16.1.6. params is definitely a Promise now.
+    // 获取当前用户
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
 
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id, 10);
+    const { id } = await params;
+    const journalId = parseInt(id);
+    const { isFollowed } = await request.json();
 
     try {
-        const { isFollowed } = await request.json();
+        if (isFollowed) {
+            // Check limit
+            const count = await prisma.userJournalFollow.count({ where: { userId } });
+            if (count >= 30) {
+                return NextResponse.json({ error: 'Limit reached: You can follow up to 30 journals.' }, { status: 400 });
+            }
 
-        const journal = await prisma.journal.update({
-            where: { id },
-            data: { isFollowed },
-        });
+            // 关注期刊
+            await prisma.userJournalFollow.upsert({
+                where: {
+                    userId_journalId: { userId, journalId }
+                },
+                create: { userId, journalId },
+                update: {}
+            });
+        } else {
+            // 取消关注
+            await prisma.userJournalFollow.deleteMany({
+                where: { userId, journalId }
+            });
+        }
 
-        return NextResponse.json(journal);
+        return NextResponse.json({ success: true, isFollowed });
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: 'Failed to update journal' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to update follow status' }, { status: 500 });
     }
 }

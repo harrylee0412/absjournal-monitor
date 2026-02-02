@@ -38,6 +38,10 @@ export default function Dashboard() {
       });
       setArticles(res.data.data);
     } catch (e) {
+      if (axios.isAxiosError(e) && e.response?.status === 401) {
+        window.location.href = '/welcome';
+        return;
+      }
       console.error(e);
     } finally {
       setLoading(false);

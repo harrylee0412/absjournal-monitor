@@ -2,14 +2,20 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, Settings, List } from 'lucide-react';
+import { UserButton } from '@neondatabase/auth/react';
 
 export default function Navbar() {
     const pathname = usePathname();
 
+    // 不在欢迎页和登录页显示导航
+    if (pathname?.startsWith('/welcome') || pathname?.startsWith('/auth')) {
+        return null;
+    }
+
     const links = [
-        { href: '/', label: 'Dashboard', icon: BookOpen },
-        { href: '/journals', label: 'Journals', icon: List },
-        { href: '/settings', label: 'Settings', icon: Settings },
+        { href: '/', label: '首页', icon: BookOpen },
+        { href: '/journals', label: '期刊', icon: List },
+        { href: '/settings', label: '设置', icon: Settings },
     ];
 
     return (
@@ -31,8 +37,8 @@ export default function Navbar() {
                                         key={link.href}
                                         href={link.href}
                                         className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors ${isActive
-                                                ? 'border-primary text-foreground'
-                                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                                            ? 'border-primary text-foreground'
+                                            : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
                                             }`}
                                     >
                                         <Icon className="w-4 h-4 mr-2" />
@@ -41,6 +47,9 @@ export default function Navbar() {
                                 );
                             })}
                         </div>
+                    </div>
+                    <div className="flex items-center">
+                        <UserButton />
                     </div>
                 </div>
             </div>

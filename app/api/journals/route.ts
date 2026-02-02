@@ -1,45 +1,67 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth/server';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
+    // 获取当前用户
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const ranking = searchParams.get('ranking'); // '4*', '3', etc.
-    const isFollowed = searchParams.get('isFollowed');
+    const ranking = searchParams.get('ranking'); // e.g., "4*", "4", "3", etc.
+    const isFt50 = searchParams.get('isFt50') === 'true';
+    const isUtd24 = searchParams.get('isUtd24') === 'true';
+    const isFollowed = searchParams.get('isFollowed') === 'true';
 
+    // 构建查询条件
     const where: any = {};
 
     if (search) {
-        where.title = { contains: search }; // SQLite is case-insensitive usually, but Prisma depends. 
-        // Usually need mode: 'insensitive' for Postgres, but for SQLite default depends on collation. 
-        // Leaving simple for now.
+        where.title = { contains: search, mode: 'insensitive' };
     }
-
     if (ranking) {
         where.ajgRanking = ranking;
     }
-
-    if (isFollowed === 'true') {
-        where.isFollowed = true;
+    if (isFt50) {
+        where.isFt50 = true;
     }
-
-    // Handle boolean filters like isFt50, isUtd24 if passed
-    const isFt50 = searchParams.get('isFt50');
-    if (isFt50 === 'true') where.isFt50 = true;
-
-    const isUtd24 = searchParams.get('isUtd24');
-    if (isUtd24 === 'true') where.isUtd24 = true;
+    if (isUtd24) {
+        where.isUtd24 = true;
+    }
+    if (isFollowed) {
+        where.followers = {
+            some: { userId }
+        };
+    }
 
     try {
         const journals = await prisma.journal.findMany({
             where,
+            take: 100,
             orderBy: { title: 'asc' },
-            take: 100 // Limit for performance
+            include: {
+                followers: {
+                    where: { userId },
+                    select: { id: true }
+                }
+            }
         });
 
-        return NextResponse.json(journals);
+        // 转换为前端格式，添加 isFollowed 字段
+        const result = journals.map(j => ({
+            ...j,
+            isFollowed: j.followers.length > 0,
+            followers: undefined // 不返回 followers 数组
+        }));
+
+        return NextResponse.json(result);
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch journals' }, { status: 500 });
     }

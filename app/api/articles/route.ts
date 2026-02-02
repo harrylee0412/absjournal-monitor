@@ -1,66 +1,96 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth/server';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
+// 获取用户的文章列表
 export async function GET(request: Request) {
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get('unread') === 'true';
-    const journalId = searchParams.get('journalId');
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-
-    const where: any = {};
-
-    if (unreadOnly) {
-        where.isRead = false;
-    }
-
-    if (journalId) {
-        where.journalId = parseInt(journalId, 10);
-    }
+    const limit = parseInt(searchParams.get('limit') || '50');
 
     try {
+        // 获取用户关注的期刊的文章
+        const followedJournalIds = await prisma.userJournalFollow.findMany({
+            where: { userId },
+            select: { journalId: true }
+        });
+
+        const journalIds = followedJournalIds.map(f => f.journalId);
+
+        // 如果用户没有关注任何期刊，返回空
+        if (journalIds.length === 0) {
+            return NextResponse.json({ data: [], total: 0 });
+        }
+
+        // 获取文章及用户的阅读状态
         const articles = await prisma.article.findMany({
-            where,
-            orderBy: { publicationDate: 'desc' }, // or createdAt
-            take: limit,
-            skip: (page - 1) * limit,
+            where: {
+                journalId: { in: journalIds },
+                ...(unreadOnly ? {
+                    NOT: {
+                        userArticles: {
+                            some: { userId, isRead: true }
+                        }
+                    }
+                } : {})
+            },
             include: {
-                journal: true // distinct selection might be better for bandwidth, but title is needed
-            }
+                journal: { select: { title: true } },
+                userArticles: {
+                    where: { userId },
+                    select: { isRead: true }
+                }
+            },
+            orderBy: { publicationDate: 'desc' },
+            take: limit
         });
 
-        const total = await prisma.article.count({ where });
+        // 转换格式
+        const result = articles.map(a => ({
+            ...a,
+            isRead: a.userArticles[0]?.isRead || false,
+            userArticles: undefined
+        }));
 
-        return NextResponse.json({
-            data: articles,
-            metadata: {
-                total,
-                page,
-                totalPages: Math.ceil(total / limit)
-            }
-        });
+        return NextResponse.json({ data: result, total: result.length });
     } catch (error) {
+        console.error(error);
         return NextResponse.json({ error: 'Failed to fetch articles' }, { status: 500 });
     }
 }
 
-// Also add PUT to mark as read
+// 更新文章阅读状态
 export async function PUT(request: Request) {
-    try {
-        const { ids, isRead } = await request.json(); // ids: number[]
-        if (!Array.isArray(ids)) return NextResponse.json({ error: 'Invalid IDs' }, { status: 400 });
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
 
-        await prisma.article.updateMany({
-            where: {
-                id: { in: ids }
-            },
-            data: { isRead }
-        });
+    const { ids, isRead } = await request.json();
+
+    try {
+        for (const articleId of ids) {
+            await prisma.userArticle.upsert({
+                where: {
+                    userId_articleId: { userId, articleId }
+                },
+                create: { userId, articleId, isRead },
+                update: { isRead }
+            });
+        }
 
         return NextResponse.json({ success: true });
-    } catch (e) {
-        return NextResponse.json({ error: 'Failed to update articles' }, { status: 500 });
+    } catch (error) {
+        return NextResponse.json({ error: 'Failed to update read status' }, { status: 500 });
     }
 }

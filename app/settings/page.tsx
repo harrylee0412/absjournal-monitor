@@ -15,6 +15,7 @@ export default function SettingsPage() {
     const [smtpUser, setSmtpUser] = useState('');
     const [smtpPass, setSmtpPass] = useState('');
     const [fromEmail, setFromEmail] = useState('');
+    const [settingsData, setSettingsData] = useState<any>(null);
 
     useEffect(() => {
         fetchSettings();
@@ -25,11 +26,12 @@ export default function SettingsPage() {
             const res = await axios.get('/api/settings');
             const data = res.data;
             if (data) {
+                setSettingsData(data);
                 setEmailEnabled(data.emailEnabled || false);
                 setTargetEmail(data.targetEmail || '');
                 if (data.smtpConfig) {
                     try {
-                        const config = JSON.parse(data.smtpConfig);
+                        const config: any = JSON.parse(data.smtpConfig);
                         setSmtpHost(config.host || '');
                         setSmtpPort(config.port || '587');
                         setSmtpUser(config.auth?.user || '');
@@ -80,7 +82,19 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-white shadow sm:rounded-lg p-6 space-y-6">
-                <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-2">Automatic Update Configuration</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                        To enable automatic updates, you can use a free service like <a href="https://cron-job.org" target="_blank" className="text-blue-600 hover:underline">cron-job.org</a> to trigger the following URL on your desired schedule (e.g., every 12 hours).
+                    </p>
+                    <div className="bg-slate-50 p-4 rounded-md border border-slate-200 break-all font-mono text-sm text-slate-700">
+                        {settingsData?.userId && settingsData?.cronApiKey
+                            ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/cron/check-updates?userId=${settingsData.userId}&apiKey=${settingsData.cronApiKey}`
+                            : 'Loading...'}
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-gray-200 pt-6">
                     <span className="flex-grow flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Enable Email Notifications</span>
                         <span className="text-sm text-gray-500">Receive daily digests of new articles.</span>

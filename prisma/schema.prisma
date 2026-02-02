@@ -8,37 +8,72 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// 期刊表 (全局共享)
 model Journal {
   id         Int       @id @default(autoincrement())
   title      String
-  printIssn  String?   // Make optional as some might not have both
+  printIssn  String?
   eIssn      String?
   ajgRanking String?
   isFt50     Boolean   @default(false)
   isUtd24    Boolean   @default(false)
-  isFollowed Boolean   @default(false)
   articles   Article[]
+  followers  UserJournalFollow[]
 }
 
+// 文章表 (全局共享)
 model Article {
-  id              Int      @id @default(autoincrement())
-  doi             String   @unique
+  id              Int           @id @default(autoincrement())
+  doi             String        @unique
   title           String
-  authors         String? // Stored as JSON string or comma separated
+  authors         String?
   abstract        String?
   publicationDate DateTime?
   url             String?
   journalId       Int
-  isRead          Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  createdAt       DateTime      @default(now())
   
-  journal         Journal  @relation(fields: [journalId], references: [id])
+  journal         Journal       @relation(fields: [journalId], references: [id])
+  userArticles    UserArticle[]
 }
 
-model Settings {
-  id             Int     @id @default(autoincrement())
-  emailEnabled   Boolean @default(false)
-  targetEmail    String?
-  smtpConfig     String? // JSON string for host, port, user, pass
-  lastCheckTime  DateTime?
+// 用户关注的期刊 (每用户独立)
+model UserJournalFollow {
+  id        Int      @id @default(autoincrement())
+  userId    String   // 来自 neon_auth.users
+  journalId Int
+  createdAt DateTime @default(now())
+  
+  journal   Journal  @relation(fields: [journalId], references: [id])
+  
+  @@unique([userId, journalId])
+  @@index([userId])
+}
+
+// 用户文章阅读状态 (每用户独立)
+model UserArticle {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  articleId Int
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  article   Article  @relation(fields: [articleId], references: [id])
+  
+  @@unique([userId, articleId])
+  @@index([userId])
+}
+
+// 用户设置 (每用户独立)
+model UserSettings {
+  id            Int       @id @default(autoincrement())
+  userId        String    @unique
+  emailEnabled  Boolean   @default(false)
+  targetEmail   String?
+  smtpConfig    String?   // JSON: {host, port, auth: {user, pass}, from}
+  cronApiKey    String?   // 用于 cron-job.org 验证
+  lastCheckTime DateTime?
+  createdAt     DateTime  @default(now())
+  
+  @@index([userId])
 }

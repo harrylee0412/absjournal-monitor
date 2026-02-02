@@ -1,43 +1,62 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth/server';
+import { headers } from 'next/headers';
+import { randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
-        const settings = await prisma.settings.findFirst();
-        return NextResponse.json(settings || {});
+        let settings = await prisma.userSettings.findUnique({ where: { userId } });
+
+        // 如果不存在，创建默认设置
+        if (!settings) {
+            settings = await prisma.userSettings.create({
+                data: {
+                    userId,
+                    cronApiKey: randomBytes(16).toString('hex') // 生成随机 API Key
+                }
+            });
+        }
+
+        return NextResponse.json(settings);
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
         const data = await request.json();
 
-        // Check if exists
-        const existing = await prisma.settings.findFirst();
-
-        let settings;
-        if (existing) {
-            settings = await prisma.settings.update({
-                where: { id: existing.id },
-                data: {
-                    emailEnabled: data.emailEnabled,
-                    targetEmail: data.targetEmail,
-                    smtpConfig: data.smtpConfig, // Expected to be JSON string already or handled by client
-                }
-            });
-        } else {
-            settings = await prisma.settings.create({
-                data: {
-                    emailEnabled: data.emailEnabled,
-                    targetEmail: data.targetEmail,
-                    smtpConfig: data.smtpConfig,
-                }
-            });
-        }
+        const settings = await prisma.userSettings.upsert({
+            where: { userId },
+            create: {
+                userId,
+                emailEnabled: data.emailEnabled,
+                targetEmail: data.targetEmail,
+                smtpConfig: data.smtpConfig,
+                cronApiKey: randomBytes(16).toString('hex')
+            },
+            update: {
+                emailEnabled: data.emailEnabled,
+                targetEmail: data.targetEmail,
+                smtpConfig: data.smtpConfig,
+            }
+        });
 
         return NextResponse.json(settings);
     } catch (error) {
