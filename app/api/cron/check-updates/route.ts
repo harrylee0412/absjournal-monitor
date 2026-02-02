@@ -13,10 +13,10 @@ export async function GET(request: Request) {
     // 如果有 CRON_SECRET 且匹配，执行全站更新
     if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
         try {
-            // 获取所有开启了邮件通知或者只是注册了的用户
+            // 获取所有开启了邮件通知或者只是注册了的用户(从 UserSettings 表获取)
             // updateArticlesForUser 内部会处理邮件发送，所以这里只需要遍历用户
-            const users = await prisma.user.findMany({
-                select: { id: true }
+            const users = await prisma.userSettings.findMany({
+                select: { userId: true }
             });
 
             console.log(`Starting system-wide update for ${users.length} users...`);
@@ -25,10 +25,10 @@ export async function GET(request: Request) {
             let updatedCount = 0;
             for (const user of users) {
                 try {
-                    await updateArticlesForUser(user.id);
+                    await updateArticlesForUser(user.userId);
                     updatedCount++;
                 } catch (uError) {
-                    console.error(`Failed to update for user ${user.id}`, uError);
+                    console.error(`Failed to update for user ${user.userId}`, uError);
                 }
             }
 
