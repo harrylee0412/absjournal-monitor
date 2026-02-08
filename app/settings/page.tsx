@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save } from 'lucide-react';
+import { Save, Clock } from 'lucide-react';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [emailEnabled, setEmailEnabled] = useState(false);
     const [targetEmail, setTargetEmail] = useState('');
+    const [preferredHour, setPreferredHour] = useState(0);
 
     // SMTP Fields
     const [smtpHost, setSmtpHost] = useState('');
@@ -15,7 +16,6 @@ export default function SettingsPage() {
     const [smtpUser, setSmtpUser] = useState('');
     const [smtpPass, setSmtpPass] = useState('');
     const [fromEmail, setFromEmail] = useState('');
-    const [settingsData, setSettingsData] = useState<any>(null);
 
     useEffect(() => {
         fetchSettings();
@@ -26,9 +26,9 @@ export default function SettingsPage() {
             const res = await axios.get('/api/settings');
             const data = res.data;
             if (data) {
-                setSettingsData(data);
                 setEmailEnabled(data.emailEnabled || false);
                 setTargetEmail(data.targetEmail || '');
+                setPreferredHour(data.preferredHour ?? 0);
                 if (data.smtpConfig) {
                     try {
                         const config: any = JSON.parse(data.smtpConfig);
@@ -64,7 +64,8 @@ export default function SettingsPage() {
             await axios.post('/api/settings', {
                 emailEnabled,
                 targetEmail,
-                smtpConfig
+                smtpConfig,
+                preferredHour
             });
             alert('Settings saved!');
         } catch (e) {
@@ -72,32 +73,49 @@ export default function SettingsPage() {
         }
     };
 
+    // Generate hour options with Beijing time display
+    const hourOptions = Array.from({ length: 24 }, (_, i) => {
+        const beijingHour = (i + 8) % 24;
+        return {
+            value: i,
+            label: `${String(beijingHour).padStart(2, '0')}:00 Beijing (${String(i).padStart(2, '0')}:00 UTC)`
+        };
+    });
+
     if (loading) return <div>Loading...</div>;
 
     return (
         <div className="max-w-2xl mx-auto space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-                <p className="text-muted-foreground mt-1">Configure email notifications.</p>
+                <p className="text-muted-foreground mt-1">Configure email notifications and update schedule.</p>
             </div>
 
             <div className="bg-white shadow sm:rounded-lg p-6 space-y-6">
+                {/* Daily Update Time */}
                 <div>
-                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-2">Automatic Update Configuration</h3>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-2 flex items-center gap-2">
+                        <Clock className="w-5 h-5" />
+                        Daily Update Schedule
+                    </h3>
                     <p className="text-sm text-gray-500 mb-4">
-                        To enable automatic updates, you can use a free service like <a href="https://cron-job.org" target="_blank" className="text-blue-600 hover:underline">cron-job.org</a> to trigger the following URL on your desired schedule (e.g., every 12 hours).
+                        Choose when you'd like to receive daily article updates. Our server will check for new articles at this time every day.
                     </p>
-                    <div className="bg-slate-50 p-4 rounded-md border border-slate-200 break-all font-mono text-sm text-slate-700">
-                        {settingsData?.userId && settingsData?.cronApiKey
-                            ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/cron/check-updates?userId=${settingsData.userId}&apiKey=${settingsData.cronApiKey}`
-                            : 'Loading...'}
-                    </div>
+                    <select
+                        value={preferredHour}
+                        onChange={e => setPreferredHour(parseInt(e.target.value))}
+                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md bg-white text-black border"
+                    >
+                        {hourOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-gray-200 pt-6">
                     <span className="flex-grow flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Enable Email Notifications</span>
-                        <span className="text-sm text-gray-500">Receive daily digests of new articles.</span>
+                        <span className="text-sm text-gray-500">Receive daily digests of new articles at your scheduled time.</span>
                     </span>
                     <button
                         type="button"

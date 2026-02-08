@@ -1,3 +1,9 @@
+/**
+ * Hourly Update Script for GitHub Actions
+ * 
+ * This script runs every hour and processes only users whose
+ * preferredHour matches the current UTC hour.
+ */
 
 import { PrismaClient } from '@prisma/client';
 import { updateArticlesForUser, sendNewArticlesEmailForUser } from '../lib/monitor';
@@ -5,49 +11,48 @@ import { updateArticlesForUser, sendNewArticlesEmailForUser } from '../lib/monit
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('Starting daily update via GitHub Actions...');
+    const currentHour = new Date().getUTCHours();
+    console.log(`[${new Date().toISOString()}] Running hourly update for UTC hour: ${currentHour}`);
 
-    // Get all users
-    const settingsList = await prisma.userSettings.findMany();
+    // Find all users whose preferred update hour matches current hour
+    const usersToProcess = await prisma.userSettings.findMany({
+        where: { preferredHour: currentHour }
+    });
 
-    console.log(`Found ${settingsList.length} users to process.`);
+    console.log(`Found ${usersToProcess.length} users scheduled for this hour`);
 
-    for (const settings of settingsList) {
+    if (usersToProcess.length === 0) {
+        console.log('No users to process. Exiting.');
+        return;
+    }
+
+    for (const settings of usersToProcess) {
+        const userId = settings.userId;
+        console.log(`\n--- Processing user: ${userId} ---`);
+
         try {
-            console.log(`Updating articles for user ${settings.userId}...`);
-
-            // Full update (ignoreIndex: true, batchSize: 10000)
-            // This bypasses the Vercel-specific batching logic
-            const newArticles = await updateArticlesForUser(settings.userId, {
-                batchSize: 10000,
-                ignoreIndex: true
+            // Full update: ignore batch index, process all journals
+            const newArticles = await updateArticlesForUser(userId, {
+                ignoreIndex: true,
+                batchSize: 100 // Process all at once
             });
 
-            if (newArticles.length > 0) {
-                console.log(`Found ${newArticles.length} new articles.`);
+            console.log(`User ${userId}: Found ${newArticles.length} new articles`);
 
-                if (settings.emailEnabled && settings.targetEmail) {
-                    console.log(`Sending email notification to ${settings.targetEmail}...`);
-                    await sendNewArticlesEmailForUser(newArticles, settings);
-                } else {
-                    console.log('Email notifications disabled for this user.');
-                }
-            } else {
-                console.log('No new articles found.');
+            // Send email if enabled and has new articles
+            if (newArticles.length > 0 && settings.emailEnabled && settings.targetEmail) {
+                console.log(`Sending email to ${settings.targetEmail}...`);
+                await sendNewArticlesEmailForUser(newArticles, settings);
+                console.log('Email sent successfully');
             }
-        } catch (e) {
-            console.error(`Error updating for user ${settings.userId}:`, e);
+        } catch (error) {
+            console.error(`Error processing user ${userId}:`, error);
         }
     }
 
-    console.log('Daily update complete.');
+    console.log('\n✅ Hourly update complete');
 }
 
 main()
-    .catch(e => {
-        console.error('Fatal error during update:', e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+    .catch(console.error)
+    .finally(() => prisma.$disconnect());

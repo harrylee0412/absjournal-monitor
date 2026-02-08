@@ -73,11 +73,13 @@ model UserSettings {
   emailEnabled  Boolean   @default(false)
   targetEmail   String?
   smtpConfig    String?   // JSON: {host, port, auth: {user, pass}, from}
-  cronApiKey    String?   // For cron-job.org authentication
+  cronApiKey    String?   // For legacy cron-job.org authentication
   lastCheckTime DateTime?
   lastProcessedJournalIndex Int @default(0)  // For batch processing
+  preferredHour Int       @default(0)        // 0-23, hour of day for updates (UTC)
   createdAt     DateTime  @default(now())
   
   @@index([userId])
+  @@index([preferredHour])
 }
 

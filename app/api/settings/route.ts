@@ -49,12 +49,14 @@ export async function POST(request: Request) {
                 emailEnabled: data.emailEnabled,
                 targetEmail: data.targetEmail,
                 smtpConfig: data.smtpConfig,
+                preferredHour: data.preferredHour ?? 0,
                 cronApiKey: randomBytes(16).toString('hex')
             },
             update: {
                 emailEnabled: data.emailEnabled,
                 targetEmail: data.targetEmail,
                 smtpConfig: data.smtpConfig,
+                preferredHour: data.preferredHour ?? undefined,
             }
         });
 

@@ -217,7 +217,24 @@ export default function Dashboard() {
 
       {/* Progress Display */}
       {updateProgress.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto shadow-inner">
+        <div className="bg-gray-900 rounded-lg p-4 max-h-80 overflow-y-auto shadow-inner">
+          {/* Progress Bar */}
+          {checkingUpdates && (
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <span>Updating journals...</span>
+                <span>{updateProgress.filter(m => m.includes('[') && !m.includes('Checking')).length} completed</span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, (updateProgress.filter(m => m.includes('[') && !m.includes('Checking')).length / Math.max(1, updateProgress.filter(m => m.includes('[')).length)) * 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <div className="space-y-1 font-mono text-sm">
             {updateProgress.map((msg, idx) => (
               <div key={idx} className="text-green-400">{msg}</div>
