@@ -4,8 +4,8 @@ import { format } from 'date-fns';
 
 const prisma = new PrismaClient();
 
-// Maximum journals to process per cron invocation (to avoid timeout)
-const BATCH_SIZE = 5;
+// Maximum journals to process per cron invocation (Safe limit: 2 to prevent 10s timeout)
+const BATCH_SIZE = 2;
 
 // Update articles for a specific user (batch processing)
 export async function updateArticlesForUser(userId: string) {
