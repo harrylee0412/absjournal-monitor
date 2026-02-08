@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<string[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(true);
   const [selectedArticles, setSelectedArticles] = useState<number[]>([]);
 
@@ -50,14 +51,67 @@ export default function Dashboard() {
 
   const checkForUpdates = async () => {
     setCheckingUpdates(true);
+    setUpdateProgress([]);
+
     try {
-      const res = await axios.post('/api/check-updates');
-      if (res.data.success) {
-        alert(`Checked for updates! Found ${res.data.newArticles} new articles.`);
-        fetchArticles();
+      const response = await fetch('/api/check-updates', { method: 'POST' });
+
+      if (!response.ok) {
+        throw new Error('Failed to check updates');
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let totalNewArticles = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const msg = JSON.parse(line);
+
+            if (msg.type === 'start') {
+              setUpdateProgress(prev => [...prev, `📚 ${msg.message}`]);
+            } else if (msg.type === 'checking') {
+              setUpdateProgress(prev => [...prev, `🔍 [${msg.index}] Checking ${msg.journal}...`]);
+            } else if (msg.type === 'done') {
+              const icon = msg.newArticles > 0 ? '✅' : '⏸️';
+              setUpdateProgress(prev => {
+                const newArr = [...prev];
+                newArr[newArr.length - 1] = `${icon} [${msg.index}] ${msg.journal}: ${msg.newArticles} new`;
+                return newArr;
+              });
+              totalNewArticles += msg.newArticles;
+            } else if (msg.type === 'error') {
+              setUpdateProgress(prev => {
+                const newArr = [...prev];
+                newArr[newArr.length - 1] = `❌ [${msg.index}] ${msg.journal}: Failed`;
+                return newArr;
+              });
+            } else if (msg.type === 'skip') {
+              setUpdateProgress(prev => [...prev, `⏭️ [${msg.index}] ${msg.journal}: Skipped (${msg.reason})`]);
+            } else if (msg.type === 'complete') {
+              setUpdateProgress(prev => [...prev, `🎉 ${msg.message}`]);
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      fetchArticles();
     } catch (e) {
-      alert('Failed to check for updates.');
+      setUpdateProgress(prev => [...prev, '❌ Failed to check for updates']);
       console.error(e);
     } finally {
       setCheckingUpdates(false);
@@ -140,6 +194,17 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Progress Display */}
+      {updateProgress.length > 0 && (
+        <div className="bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto shadow-inner">
+          <div className="space-y-1 font-mono text-sm">
+            {updateProgress.map((msg, idx) => (
+              <div key={idx} className="text-green-400">{msg}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center space-x-4">
         <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
