@@ -170,7 +170,7 @@ export default function Dashboard() {
                       className="rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-primary truncate max-w-3xl">
+                      <p className="text-sm font-medium text-primary">
                         <a href={`http://doi.org/${article.doi}`} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
                           {article.title}
                           <ExternalLink className="w-3 h-3 text-gray-400" />
