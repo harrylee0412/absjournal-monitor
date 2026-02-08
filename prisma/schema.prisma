@@ -8,20 +8,22 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 期刊表 (全局共享)
+// Journal table (globally shared)
 model Journal {
   id         Int       @id @default(autoincrement())
   title      String
   printIssn  String?
   eIssn      String?
   ajgRanking String?
+  domain     String?   // ABS field/domain (e.g., "Entrepreneurship and Small Business Management")
   isFt50     Boolean   @default(false)
   isUtd24    Boolean   @default(false)
+  isCustom   Boolean   @default(false)  // User-added custom journal
   articles   Article[]
   followers  UserJournalFollow[]
 }
 
-// 文章表 (全局共享)
+// Article table (globally shared)
 model Article {
   id              Int           @id @default(autoincrement())
   doi             String        @unique
@@ -37,7 +39,7 @@ model Article {
   userArticles    UserArticle[]
 }
 
-// 用户关注的期刊 (每用户独立)
+// User journal follows (per-user)
 model UserJournalFollow {
   id        Int      @id @default(autoincrement())
   userId    String   // 来自 neon_auth.users
@@ -50,7 +52,7 @@ model UserJournalFollow {
   @@index([userId])
 }
 
-// 用户文章阅读状态 (每用户独立)
+// User article read status (per-user)
 model UserArticle {
   id        Int      @id @default(autoincrement())
   userId    String
@@ -64,16 +66,18 @@ model UserArticle {
   @@index([userId])
 }
 
-// 用户设置 (每用户独立)
+// User settings (per-user)
 model UserSettings {
   id            Int       @id @default(autoincrement())
   userId        String    @unique
   emailEnabled  Boolean   @default(false)
   targetEmail   String?
   smtpConfig    String?   // JSON: {host, port, auth: {user, pass}, from}
-  cronApiKey    String?   // 用于 cron-job.org 验证
+  cronApiKey    String?   // For cron-job.org authentication
   lastCheckTime DateTime?
+  lastProcessedJournalIndex Int @default(0)  // For batch processing
   createdAt     DateTime  @default(now())
   
   @@index([userId])
 }
+

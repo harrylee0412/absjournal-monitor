@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth/server';
-import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
-    // 获取当前用户
+    // Get current user
     const { data: session } = await auth.getSession();
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -15,12 +14,25 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const ranking = searchParams.get('ranking'); // e.g., "4*", "4", "3", etc.
+    const ranking = searchParams.get('ranking');
+    const domain = searchParams.get('domain');
     const isFt50 = searchParams.get('isFt50') === 'true';
     const isUtd24 = searchParams.get('isUtd24') === 'true';
     const isFollowed = searchParams.get('isFollowed') === 'true';
+    const getDomains = searchParams.get('getDomains') === 'true';
 
-    // 构建查询条件
+    // Return distinct domains for dropdown
+    if (getDomains) {
+        const domains = await prisma.journal.findMany({
+            where: { domain: { not: null } },
+            select: { domain: true },
+            distinct: ['domain'],
+            orderBy: { domain: 'asc' }
+        });
+        return NextResponse.json(domains.map(d => d.domain).filter(Boolean));
+    }
+
+    // Build query conditions
     const where: any = {};
 
     if (search) {
@@ -28,6 +40,9 @@ export async function GET(request: Request) {
     }
     if (ranking) {
         where.ajgRanking = ranking;
+    }
+    if (domain) {
+        where.domain = domain;
     }
     if (isFt50) {
         where.isFt50 = true;
@@ -54,11 +69,11 @@ export async function GET(request: Request) {
             }
         });
 
-        // 转换为前端格式，添加 isFollowed 字段
+        // Transform to frontend format with isFollowed field
         const result = journals.map(j => ({
             ...j,
             isFollowed: j.followers.length > 0,
-            followers: undefined // 不返回 followers 数组
+            followers: undefined
         }));
 
         return NextResponse.json(result);

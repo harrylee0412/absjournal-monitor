@@ -1,37 +1,42 @@
 import { PrismaClient } from '@prisma/client';
 import { fetchNewArticlesForJournal } from '@/lib/crossref';
+import { format } from 'date-fns';
 
 const prisma = new PrismaClient();
 
-// 为特定用户更新文章
+// Maximum journals to process per cron invocation (to avoid timeout)
+const BATCH_SIZE = 5;
+
+// Update articles for a specific user (batch processing)
 export async function updateArticlesForUser(userId: string) {
+    // Get user settings for batch tracking
+    const settings = await prisma.userSettings.findUnique({ where: { userId } });
+    const startIndex = settings?.lastProcessedJournalIndex || 0;
+
     const followedJournals = await prisma.userJournalFollow.findMany({
         where: { userId },
-        include: { journal: true }
+        include: { journal: true },
+        orderBy: { journalId: 'asc' }
     });
 
-    console.log(`Checking updates for ${followedJournals.length} journals (user: ${userId})...`);
+    console.log(`User ${userId}: Processing journals ${startIndex} to ${startIndex + BATCH_SIZE - 1} of ${followedJournals.length}`);
 
+    // Get batch to process
+    const batch = followedJournals.slice(startIndex, startIndex + BATCH_SIZE);
     const newArticles: any[] = [];
 
-    // Concurrency limit to avoid overwhelming the server or reaching timeouts
-    const MAX_CONCURRENT = 5;
-    const results = [];
-
-    // Split into chunks or use a pool
-    const processFollow = async (follow: any) => {
+    for (const follow of batch) {
         const journal = follow.journal;
         const issn = journal.printIssn || journal.eIssn;
-        if (!issn) return [];
+        if (!issn) continue;
 
-        const journalNewArticles = [];
         try {
             const articles = await fetchNewArticlesForJournal(issn);
             for (const work of articles) {
                 try {
                     const doi = work.DOI;
                     const title = work.title?.[0] || 'No Title';
-                    const authors = work.author?.map((a: any) => `${a.given} ${a.family}`).join(', ') || '';
+                    const authors = work.author?.map((a: any) => `${a.given || ''} ${a.family || ''}`).join(', ') || '';
                     const abstract = work.abstract || '';
                     const pubDate = new Date(work.created['date-time']);
                     const url = work.URL;
@@ -54,7 +59,7 @@ export async function updateArticlesForUser(userId: string) {
                         await prisma.userArticle.create({
                             data: { userId, articleId: article.id, isRead: false }
                         });
-                        journalNewArticles.push({ ...article, journal });
+                        newArticles.push({ ...article, journal });
                     }
                 } catch (e) {
                     console.error(`Failed to save article ${work.DOI}`, e);
@@ -63,24 +68,29 @@ export async function updateArticlesForUser(userId: string) {
         } catch (jError) {
             console.error(`Failed to update journal ${journal.title}`, jError);
         }
-        return journalNewArticles;
-    };
-
-    // Execute in batches
-    for (let i = 0; i < followedJournals.length; i += MAX_CONCURRENT) {
-        const chunk = followedJournals.slice(i, i + MAX_CONCURRENT);
-        const chunkResults = await Promise.all(chunk.map(processFollow));
-        chunkResults.forEach(r => newArticles.push(...r));
     }
+
+    // Update batch index
+    const nextIndex = startIndex + BATCH_SIZE >= followedJournals.length ? 0 : startIndex + BATCH_SIZE;
+    const isComplete = nextIndex === 0 && startIndex !== 0;
+
+    await prisma.userSettings.update({
+        where: { userId },
+        data: {
+            lastProcessedJournalIndex: nextIndex,
+            lastCheckTime: isComplete ? new Date() : undefined
+        }
+    });
+
+    console.log(`User ${userId}: Batch complete. Next index: ${nextIndex}. Found ${newArticles.length} new articles.`);
 
     return newArticles;
 }
 
-// 发送邮件给特定用户
+// Send email to a specific user
 export async function sendNewArticlesEmailForUser(newArticles: any[], settings: any) {
     if (!settings.smtpConfig || !settings.targetEmail) return;
 
-    // 动态导入 nodemailer，避免在非 Node 环境报错（虽然这里是在 Server 上）
     const nodemailer = await import('nodemailer');
 
     let transporter;
@@ -97,24 +107,25 @@ export async function sendNewArticlesEmailForUser(newArticles: any[], settings: 
 
     const htmlContent = `
     <h1>Journal Monitor Update</h1>
-    <p>为您找到 ${newArticles.length} 篇新文章：</p>
+    <p>Found ${newArticles.length} new articles for you:</p>
     <ul>
       ${newArticles.map(a => `
-        <li style="margin-bottom: 10px;">
-          <strong><a href="${a.url || `http://doi.org/${a.doi}`}">${a.title}</a></strong><br/>
+        <li style="margin-bottom: 15px;">
+          <strong><a href="${a.url || `https://doi.org/${a.doi}`}">${a.title}</a></strong><br/>
           <em style="color: #666;">${a.authors || 'Unknown Authors'}</em><br/>
-          <span style="font-size: 0.9em; color: #888;">${a.journal?.title || 'Journal'}</span>
+          <span style="font-size: 0.9em; color: #888;">${a.journal?.title || 'Journal'}</span><br/>
+          <span style="font-size: 0.85em; color: #999;">Published: ${a.publicationDate ? format(new Date(a.publicationDate), 'yyyy-MM-dd') : 'Unknown'}</span>
         </li>
       `).join('')}
     </ul>
-    <p style="font-size: 12px; color: #999;">此邮件由 Journal Monitor 自动发送</p>
+    <p style="font-size: 12px; color: #999;">This email was sent automatically by Journal Monitor</p>
   `;
 
     try {
         await transporter.sendMail({
             from: fromEmail,
             to: settings.targetEmail,
-            subject: `[Journal Monitor] ${newArticles.length} 新文章推送`,
+            subject: `[Journal Monitor] ${newArticles.length} New Articles Found`,
             html: htmlContent
         });
         console.log(`Email sent to ${settings.targetEmail}`);
