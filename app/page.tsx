@@ -53,8 +53,15 @@ export default function Dashboard() {
     setCheckingUpdates(true);
     setUpdateProgress([]);
 
-    try {
-      const response = await fetch('/api/check-updates', { method: 'POST' });
+    let totalNewArticles = 0;
+
+    // Recursive function to process batches
+    const processBatch = async (startIndex: number): Promise<void> => {
+      const response = await fetch('/api/check-updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startIndex })
+      });
 
       if (!response.ok) {
         throw new Error('Failed to check updates');
@@ -67,7 +74,8 @@ export default function Dashboard() {
         throw new Error('No response body');
       }
 
-      let totalNewArticles = 0;
+      let nextIndex: number | null = null;
+      let hasMore = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -80,7 +88,7 @@ export default function Dashboard() {
           try {
             const msg = JSON.parse(line);
 
-            if (msg.type === 'start') {
+            if (msg.type === 'batch_start') {
               setUpdateProgress(prev => [...prev, `📚 ${msg.message}`]);
             } else if (msg.type === 'checking') {
               setUpdateProgress(prev => [...prev, `🔍 [${msg.index}] Checking ${msg.journal}...`]);
@@ -100,8 +108,12 @@ export default function Dashboard() {
               });
             } else if (msg.type === 'skip') {
               setUpdateProgress(prev => [...prev, `⏭️ [${msg.index}] ${msg.journal}: Skipped (${msg.reason})`]);
-            } else if (msg.type === 'complete') {
-              setUpdateProgress(prev => [...prev, `🎉 ${msg.message}`]);
+            } else if (msg.type === 'batch_complete') {
+              nextIndex = msg.nextIndex;
+              hasMore = msg.hasMore;
+              if (!hasMore) {
+                setUpdateProgress(prev => [...prev, `🎉 All done! Found ${totalNewArticles} new articles total.`]);
+              }
             }
           } catch {
             // Ignore parse errors
@@ -109,6 +121,14 @@ export default function Dashboard() {
         }
       }
 
+      // If there are more journals, continue with next batch
+      if (hasMore && nextIndex !== null) {
+        await processBatch(nextIndex);
+      }
+    };
+
+    try {
+      await processBatch(0);
       fetchArticles();
     } catch (e) {
       setUpdateProgress(prev => [...prev, '❌ Failed to check for updates']);

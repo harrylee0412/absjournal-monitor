@@ -6,7 +6,10 @@ import { sendNewArticlesEmailForUser } from '@/lib/monitor';
 const prisma = new PrismaClient();
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // Allow up to 60 seconds for streaming
+export const maxDuration = 60;
+
+// Process 10 journals per request to stay well under timeout
+const BATCH_SIZE = 10;
 
 export async function POST(request: Request) {
     // 1. Verify user session
@@ -19,14 +22,27 @@ export async function POST(request: Request) {
     }
     const userId = session.user.id;
 
-    // 2. Get followed journals
+    // 2. Get startIndex from request body
+    let startIndex = 0;
+    try {
+        const body = await request.json();
+        startIndex = body.startIndex || 0;
+    } catch {
+        // No body or invalid JSON, start from 0
+    }
+
+    // 3. Get followed journals
     const followedJournals = await prisma.userJournalFollow.findMany({
         where: { userId },
         include: { journal: true },
         orderBy: { journalId: 'asc' }
     });
 
-    // 3. Create streaming response
+    const totalJournals = followedJournals.length;
+    const endIndex = Math.min(startIndex + BATCH_SIZE, totalJournals);
+    const batch = followedJournals.slice(startIndex, endIndex);
+
+    // 4. Create streaming response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
         async start(controller) {
@@ -34,23 +50,28 @@ export async function POST(request: Request) {
                 controller.enqueue(encoder.encode(JSON.stringify(msg) + '\n'));
             };
 
-            const allNewArticles: any[] = [];
+            const batchNewArticles: any[] = [];
 
             sendMessage({
-                type: 'start',
-                total: followedJournals.length,
-                message: `Starting update for ${followedJournals.length} journals...`
+                type: 'batch_start',
+                startIndex,
+                endIndex,
+                total: totalJournals,
+                message: startIndex === 0
+                    ? `Starting update for ${totalJournals} journals...`
+                    : `Continuing from journal ${startIndex + 1}...`
             });
 
-            for (let i = 0; i < followedJournals.length; i++) {
-                const follow = followedJournals[i];
+            for (let i = 0; i < batch.length; i++) {
+                const globalIndex = startIndex + i + 1;
+                const follow = batch[i];
                 const journal = follow.journal;
                 const issn = journal.printIssn || journal.eIssn;
 
                 if (!issn) {
                     sendMessage({
                         type: 'skip',
-                        index: i + 1,
+                        index: globalIndex,
                         journal: journal.title,
                         reason: 'No ISSN'
                     });
@@ -60,7 +81,7 @@ export async function POST(request: Request) {
                 try {
                     sendMessage({
                         type: 'checking',
-                        index: i + 1,
+                        index: globalIndex,
                         journal: journal.title
                     });
 
@@ -92,7 +113,7 @@ export async function POST(request: Request) {
                                 await prisma.userArticle.create({
                                     data: { userId, articleId: article.id, isRead: false }
                                 });
-                                allNewArticles.push({ ...article, journal });
+                                batchNewArticles.push({ ...article, journal });
                                 newCount++;
                             }
                         } catch (e) {
@@ -102,14 +123,14 @@ export async function POST(request: Request) {
 
                     sendMessage({
                         type: 'done',
-                        index: i + 1,
+                        index: globalIndex,
                         journal: journal.title,
                         newArticles: newCount
                     });
                 } catch (jError) {
                     sendMessage({
                         type: 'error',
-                        index: i + 1,
+                        index: globalIndex,
                         journal: journal.title,
                         error: 'Failed to fetch'
                     });
@@ -117,25 +138,35 @@ export async function POST(request: Request) {
                 }
             }
 
-            // 4. Update last check time
-            await prisma.userSettings.update({
-                where: { userId },
-                data: { lastCheckTime: new Date() }
-            }).catch(() => { });
+            const hasMore = endIndex < totalJournals;
+            const isComplete = !hasMore;
 
-            // 5. Send email if enabled and new articles found
-            if (allNewArticles.length > 0) {
-                const settings = await prisma.userSettings.findUnique({ where: { userId } });
-                if (settings?.emailEnabled && settings?.targetEmail) {
-                    await sendNewArticlesEmailForUser(allNewArticles, settings);
-                }
+            // Update last check time only when fully complete
+            if (isComplete) {
+                await prisma.userSettings.update({
+                    where: { userId },
+                    data: { lastCheckTime: new Date() }
+                }).catch(() => { });
             }
 
+            // Send batch completion signal
             sendMessage({
-                type: 'complete',
-                totalNewArticles: allNewArticles.length,
-                message: `Update complete! Found ${allNewArticles.length} new articles.`
+                type: 'batch_complete',
+                batchNewArticles: batchNewArticles.length,
+                nextIndex: hasMore ? endIndex : null,
+                hasMore,
+                message: hasMore
+                    ? `Batch complete (${batchNewArticles.length} new). Continuing...`
+                    : `🎉 All done! Found ${batchNewArticles.length} new articles in this batch.`
             });
+
+            // If complete and has new articles, send email
+            if (isComplete && batchNewArticles.length > 0) {
+                const settings = await prisma.userSettings.findUnique({ where: { userId } });
+                if (settings?.emailEnabled && settings?.targetEmail) {
+                    await sendNewArticlesEmailForUser(batchNewArticles, settings);
+                }
+            }
 
             controller.close();
         }
