@@ -8,10 +8,12 @@ const prisma = new PrismaClient();
 const BATCH_SIZE = 2;
 
 // Update articles for a specific user (batch processing)
-export async function updateArticlesForUser(userId: string) {
+export async function updateArticlesForUser(userId: string, options?: { batchSize?: number, ignoreIndex?: boolean }) {
     // Get user settings for batch tracking
     const settings = await prisma.userSettings.findUnique({ where: { userId } });
-    const startIndex = settings?.lastProcessedJournalIndex || 0;
+
+    // Determine start index: 0 if ignoring index (full update), otherwise use DB value
+    const startIndex = options?.ignoreIndex ? 0 : (settings?.lastProcessedJournalIndex || 0);
 
     const followedJournals = await prisma.userJournalFollow.findMany({
         where: { userId },
@@ -19,10 +21,12 @@ export async function updateArticlesForUser(userId: string) {
         orderBy: { journalId: 'asc' }
     });
 
-    console.log(`User ${userId}: Processing journals ${startIndex} to ${startIndex + BATCH_SIZE - 1} of ${followedJournals.length}`);
+    const limit = options?.batchSize || BATCH_SIZE;
+
+    console.log(`User ${userId}: Processing journals ${startIndex} to ${startIndex + limit - 1} of ${followedJournals.length}`);
 
     // Get batch to process
-    const batch = followedJournals.slice(startIndex, startIndex + BATCH_SIZE);
+    const batch = followedJournals.slice(startIndex, startIndex + limit);
     const newArticles: any[] = [];
 
     for (const follow of batch) {
@@ -70,19 +74,27 @@ export async function updateArticlesForUser(userId: string) {
         }
     }
 
-    // Update batch index
-    const nextIndex = startIndex + BATCH_SIZE >= followedJournals.length ? 0 : startIndex + BATCH_SIZE;
-    const isComplete = nextIndex === 0 && startIndex !== 0;
+    // Only update batch index if NOT ignoring index (i.e. Vercel mode)
+    if (!options?.ignoreIndex) {
+        const nextIndex = startIndex + limit >= followedJournals.length ? 0 : startIndex + limit;
+        const isComplete = nextIndex === 0 && startIndex !== 0;
 
-    await prisma.userSettings.update({
-        where: { userId },
-        data: {
-            lastProcessedJournalIndex: nextIndex,
-            lastCheckTime: isComplete ? new Date() : undefined
-        }
-    });
-
-    console.log(`User ${userId}: Batch complete. Next index: ${nextIndex}. Found ${newArticles.length} new articles.`);
+        await prisma.userSettings.update({
+            where: { userId },
+            data: {
+                lastProcessedJournalIndex: nextIndex,
+                lastCheckTime: isComplete ? new Date() : undefined
+            }
+        });
+        console.log(`User ${userId}: Batch complete. Next index: ${nextIndex}.`);
+    } else {
+        // For full update, just update check time
+        await prisma.userSettings.update({
+            where: { userId },
+            data: { lastCheckTime: new Date() }
+        });
+        console.log(`User ${userId}: Full update complete.`);
+    }
 
     return newArticles;
 }
