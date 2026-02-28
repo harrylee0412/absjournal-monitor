@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Clock } from 'lucide-react';
+import { Save, Clock, Copy, Check } from 'lucide-react';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -17,6 +17,17 @@ export default function SettingsPage() {
     const [smtpPass, setSmtpPass] = useState('');
     const [fromEmail, setFromEmail] = useState('');
 
+    // Zotero plugin fields
+    const [userId, setUserId] = useState('');
+    const [cronApiKey, setCronApiKey] = useState('');
+    const [copied, setCopied] = useState('');
+
+    const copyToClipboard = (text: string, field: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(field);
+        setTimeout(() => setCopied(''), 2000);
+    };
+
     useEffect(() => {
         fetchSettings();
     }, []);
@@ -26,6 +37,8 @@ export default function SettingsPage() {
             const res = await axios.get('/api/settings');
             const data = res.data;
             if (data) {
+                setUserId(data.userId || '');
+                setCronApiKey(data.cronApiKey || '');
                 setEmailEnabled(data.emailEnabled || false);
                 setTargetEmail(data.targetEmail || '');
                 setPreferredHour(data.preferredHour ?? 0);
@@ -207,6 +220,40 @@ export default function SettingsPage() {
                         <Save className="mr-2 h-4 w-4" />
                         Save Settings
                     </button>
+                </div>
+            </div>
+
+            {/* Zotero Plugin Section */}
+            <div className="bg-white shadow sm:rounded-lg p-6 space-y-4">
+                <div>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-1">Zotero Plugin</h3>
+                    <p className="text-sm text-gray-500">
+                        Copy these values into the Zotero Journal Monitor Sync plugin settings.
+                    </p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">User ID</label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                        <input type="text" readOnly value={userId}
+                            className="flex-1 block w-full border border-gray-300 rounded-l-md py-2 px-3 bg-gray-50 text-sm font-mono text-gray-700" />
+                        <button onClick={() => copyToClipboard(userId, 'userId')}
+                            className="inline-flex items-center px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm text-gray-600">
+                            {copied === 'userId' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">API Key</label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                        <input type="text" readOnly value={cronApiKey}
+                            className="flex-1 block w-full border border-gray-300 rounded-l-md py-2 px-3 bg-gray-50 text-sm font-mono text-gray-700" />
+                        <button onClick={() => copyToClipboard(cronApiKey, 'apiKey')}
+                            className="inline-flex items-center px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm text-gray-600">
+                            {copied === 'apiKey' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
