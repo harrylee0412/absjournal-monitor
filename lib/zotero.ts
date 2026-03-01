@@ -6,6 +6,7 @@ interface ZoteroCollection {
     key: string;
     name: string;
     parentCollection: string | false;
+    deleted?: boolean;
   };
 }
 
@@ -209,6 +210,42 @@ function articleToZoteroItem(
 }
 
 /**
+ * Get all existing DOIs in a collection (handles pagination).
+ */
+async function listExistingDOIs(
+  userId: string,
+  apiKey: string,
+  collectionKey: string
+): Promise<Set<string>> {
+  const dois = new Set<string>();
+  let start = 0;
+  const limit = 100;
+
+  while (true) {
+    const res = await zoteroFetch(
+      `/users/${userId}/collections/${collectionKey}/items?limit=${limit}&start=${start}&itemType=journalArticle`,
+      apiKey
+    );
+    if (!res.ok) break;
+
+    const data: { data: { DOI?: string } }[] = await res.json();
+    for (const item of data) {
+      if (item.data.DOI) {
+        dois.add(item.data.DOI.toLowerCase());
+      }
+    }
+
+    const totalResults = parseInt(res.headers.get('Total-Results') || '0', 10);
+    start += limit;
+    if (start >= totalResults || data.length === 0) break;
+
+    await delay(100);
+  }
+
+  return dois;
+}
+
+/**
  * Main sync function: sync journals and articles to Zotero.
  */
 export async function syncToZotero(
@@ -220,9 +257,9 @@ export async function syncToZotero(
   // 1. Get all existing collections
   const existingCollections = await listCollections(userId, apiKey);
 
-  // 2. Find or create "Journal Monitor" root collection
+  // 2. Find or create "Journal Monitor" root collection (skip deleted ones)
   let rootCollection = existingCollections.find(
-    (c) => c.data.name === 'Journal Monitor' && c.data.parentCollection === false
+    (c) => c.data.name === 'Journal Monitor' && c.data.parentCollection === false && !c.data.deleted
   );
 
   let collectionsCreated = 0;
@@ -263,22 +300,36 @@ export async function syncToZotero(
     }
   }
 
-  // 4. Create article items, grouped by journal
+  // 4. Create article items, grouped by journal (with DOI dedup)
   let itemsCreated = 0;
   const itemsByCollection = new Map<string, Record<string, unknown>[]>();
 
+  // Group articles by collection key
+  const articlesByCollection = new Map<string, ZoteroArticle[]>();
   for (const article of articles) {
     const collectionKey = journalCollectionMap.get(article.journal.title);
     if (!collectionKey) continue;
-
-    const item = articleToZoteroItem(article, collectionKey);
-    const existing = itemsByCollection.get(collectionKey) || [];
-    existing.push(item);
-    itemsByCollection.set(collectionKey, existing);
+    const existing = articlesByCollection.get(collectionKey) || [];
+    existing.push(article);
+    articlesByCollection.set(collectionKey, existing);
   }
 
-  for (const [, items] of itemsByCollection) {
-    itemsCreated += await createItems(userId, apiKey, items);
+  // For each collection, fetch existing DOIs and filter out duplicates
+  for (const [collectionKey, collectionArticles] of articlesByCollection) {
+    const existingDOIs = await listExistingDOIs(userId, apiKey, collectionKey);
+
+    const newItems: Record<string, unknown>[] = [];
+    for (const article of collectionArticles) {
+      // Skip if DOI already exists in this collection
+      if (article.doi && existingDOIs.has(article.doi.toLowerCase())) {
+        continue;
+      }
+      newItems.push(articleToZoteroItem(article, collectionKey));
+    }
+
+    if (newItems.length > 0) {
+      itemsCreated += await createItems(userId, apiKey, newItems);
+    }
   }
 
   return { collectionsCreated, itemsCreated };
