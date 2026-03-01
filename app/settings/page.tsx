@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Clock, Copy, Check } from 'lucide-react';
+import { Save, Clock, Copy, Check, RefreshCw, Wifi, BookOpen } from 'lucide-react';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -22,6 +22,14 @@ export default function SettingsPage() {
     const [cronApiKey, setCronApiKey] = useState('');
     const [copied, setCopied] = useState('');
 
+    // Zotero Web API fields
+    const [zoteroUserId, setZoteroUserId] = useState('');
+    const [zoteroApiKey, setZoteroApiKey] = useState('');
+    const [zoteroTestResult, setZoteroTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+    const [zoteroTesting, setZoteroTesting] = useState(false);
+    const [zoteroSyncing, setZoteroSyncing] = useState(false);
+    const [zoteroSyncResult, setZoteroSyncResult] = useState<string | null>(null);
+
     const copyToClipboard = (text: string, field: string) => {
         navigator.clipboard.writeText(text);
         setCopied(field);
@@ -39,6 +47,8 @@ export default function SettingsPage() {
             if (data) {
                 setUserId(data.userId || '');
                 setCronApiKey(data.cronApiKey || '');
+                setZoteroUserId(data.zoteroUserId || '');
+                setZoteroApiKey(data.zoteroApiKey || '');
                 setEmailEnabled(data.emailEnabled || false);
                 setTargetEmail(data.targetEmail || '');
                 setPreferredHour(data.preferredHour ?? 0);
@@ -78,7 +88,9 @@ export default function SettingsPage() {
                 emailEnabled,
                 targetEmail,
                 smtpConfig,
-                preferredHour
+                preferredHour,
+                zoteroUserId: zoteroUserId || undefined,
+                zoteroApiKey: zoteroApiKey || undefined,
             });
             alert('Settings saved!');
         } catch (e) {
@@ -223,38 +235,117 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            {/* Zotero Plugin Section */}
+            {/* Zotero Sync Section */}
             <div className="bg-white shadow sm:rounded-lg p-6 space-y-4">
                 <div>
-                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-1">Zotero Plugin</h3>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-1 flex items-center gap-2">
+                        <BookOpen className="w-5 h-5" />
+                        Zotero Sync
+                    </h3>
                     <p className="text-sm text-gray-500">
-                        Copy these values into the Zotero Journal Monitor Sync plugin settings.
+                        通过 Zotero Web API 将关注的期刊文章同步到你的 Zotero 云端库。
+                        请前往 <a href="https://www.zotero.org/settings/keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">zotero.org/settings/keys</a> 获取 User ID 和创建 API Key（需要读写权限）。
                     </p>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">User ID</label>
-                    <div className="mt-1 flex rounded-md shadow-sm">
-                        <input type="text" readOnly value={userId}
-                            className="flex-1 block w-full border border-gray-300 rounded-l-md py-2 px-3 bg-gray-50 text-sm font-mono text-gray-700" />
-                        <button onClick={() => copyToClipboard(userId, 'userId')}
-                            className="inline-flex items-center px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm text-gray-600">
-                            {copied === 'userId' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                    </div>
+                    <label className="block text-sm font-medium text-gray-700">Zotero User ID</label>
+                    <input
+                        type="text"
+                        value={zoteroUserId}
+                        onChange={e => setZoteroUserId(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                        placeholder="例如: 12345678"
+                    />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">API Key</label>
-                    <div className="mt-1 flex rounded-md shadow-sm">
-                        <input type="text" readOnly value={cronApiKey}
-                            className="flex-1 block w-full border border-gray-300 rounded-l-md py-2 px-3 bg-gray-50 text-sm font-mono text-gray-700" />
-                        <button onClick={() => copyToClipboard(cronApiKey, 'apiKey')}
-                            className="inline-flex items-center px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm text-gray-600">
-                            {copied === 'apiKey' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                    </div>
+                    <label className="block text-sm font-medium text-gray-700">Zotero API Key</label>
+                    <input
+                        type="password"
+                        value={zoteroApiKey}
+                        onChange={e => setZoteroApiKey(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                        placeholder="以字母数字组成的 API Key"
+                    />
                 </div>
+
+                <div className="flex gap-3">
+                    <button
+                        onClick={async () => {
+                            setZoteroTesting(true);
+                            setZoteroTestResult(null);
+                            try {
+                                // Save credentials first
+                                const smtpConfig = JSON.stringify({
+                                    host: smtpHost, port: parseInt(smtpPort),
+                                    auth: { user: smtpUser, pass: smtpPass }, from: fromEmail
+                                });
+                                await axios.post('/api/settings', {
+                                    emailEnabled, targetEmail, smtpConfig, preferredHour,
+                                    zoteroUserId: zoteroUserId || undefined,
+                                    zoteroApiKey: zoteroApiKey || undefined,
+                                });
+                                const res = await axios.post('/api/zotero/test');
+                                setZoteroTestResult(res.data);
+                            } catch (e: any) {
+                                setZoteroTestResult({ ok: false, message: e.response?.data?.message || '测试失败' });
+                            } finally {
+                                setZoteroTesting(false);
+                            }
+                        }}
+                        disabled={zoteroTesting || !zoteroUserId || !zoteroApiKey}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+                    >
+                        <Wifi className="mr-2 h-4 w-4" />
+                        {zoteroTesting ? '测试中...' : '测试连接'}
+                    </button>
+
+                    <button
+                        onClick={async () => {
+                            setZoteroSyncing(true);
+                            setZoteroSyncResult(null);
+                            try {
+                                // Save credentials first
+                                const smtpConfig = JSON.stringify({
+                                    host: smtpHost, port: parseInt(smtpPort),
+                                    auth: { user: smtpUser, pass: smtpPass }, from: fromEmail
+                                });
+                                await axios.post('/api/settings', {
+                                    emailEnabled, targetEmail, smtpConfig, preferredHour,
+                                    zoteroUserId: zoteroUserId || undefined,
+                                    zoteroApiKey: zoteroApiKey || undefined,
+                                });
+                                const res = await axios.post('/api/zotero/sync');
+                                const d = res.data;
+                                setZoteroSyncResult(
+                                    `同步完成！创建了 ${d.collectionsCreated} 个分类，${d.itemsCreated} 篇文章条目（共 ${d.totalJournals} 本期刊，${d.totalArticles} 篇文章）。`
+                                );
+                            } catch (e: any) {
+                                setZoteroSyncResult(e.response?.data?.error || '同步失败');
+                            } finally {
+                                setZoteroSyncing(false);
+                            }
+                        }}
+                        disabled={zoteroSyncing || !zoteroUserId || !zoteroApiKey}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${zoteroSyncing ? 'animate-spin' : ''}`} />
+                        {zoteroSyncing ? '同步中...' : '同步到 Zotero'}
+                    </button>
+                </div>
+
+                {zoteroTestResult && (
+                    <div className={`p-3 rounded-md text-sm ${zoteroTestResult.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                        {zoteroTestResult.message}
+                    </div>
+                )}
+
+                {zoteroSyncResult && (
+                    <div className="p-3 rounded-md text-sm bg-blue-50 text-blue-800">
+                        {zoteroSyncResult}
+                    </div>
+                )}
             </div>
         </div>
     );

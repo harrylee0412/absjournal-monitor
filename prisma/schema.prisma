@@ -74,6 +74,8 @@ model UserSettings {
   targetEmail   String?
   smtpConfig    String?   // JSON: {host, port, auth: {user, pass}, from}
   cronApiKey    String?   // For legacy cron-job.org authentication
+  zoteroUserId  String?   // Zotero numeric User ID (from zotero.org/settings/keys)
+  zoteroApiKey  String?   // Zotero API Key (needs read/write permissions)
   lastCheckTime DateTime?
   lastProcessedJournalIndex Int @default(0)  // For batch processing
   preferredHour Int       @default(0)        // 0-23, hour of day for updates (UTC)

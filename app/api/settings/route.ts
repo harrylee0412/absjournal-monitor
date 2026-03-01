@@ -50,6 +50,8 @@ export async function POST(request: Request) {
                 targetEmail: data.targetEmail,
                 smtpConfig: data.smtpConfig,
                 preferredHour: data.preferredHour ?? 0,
+                zoteroUserId: data.zoteroUserId ?? undefined,
+                zoteroApiKey: data.zoteroApiKey ?? undefined,
                 cronApiKey: randomBytes(16).toString('hex')
             },
             update: {
@@ -57,6 +59,8 @@ export async function POST(request: Request) {
                 targetEmail: data.targetEmail,
                 smtpConfig: data.smtpConfig,
                 preferredHour: data.preferredHour ?? undefined,
+                zoteroUserId: data.zoteroUserId ?? undefined,
+                zoteroApiKey: data.zoteroApiKey ?? undefined,
             }
         });
 
