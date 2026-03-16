@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth/server';
 import { Article, Journal, PrismaClient, UserSettings } from '@prisma/client';
 import { fetchNewArticlesForJournal } from '@/lib/crossref';
 import { sendNewArticlesEmailForUser } from '@/lib/monitor';
+import { after } from 'next/server';
 
 const prisma = new PrismaClient();
 
@@ -22,6 +23,9 @@ function getEnvNumber(name: string, fallback: number, min = 0) {
 
 const JOURNAL_PROCESS_TIMEOUT_MS = getEnvNumber('JOURNAL_PROCESS_TIMEOUT_MS', 120000, 5000);
 const UPDATE_HEARTBEAT_MS = getEnvNumber('UPDATE_HEARTBEAT_MS', 3000, 500);
+const UPDATE_REQUEST_SOFT_TIMEOUT_MS = getEnvNumber('UPDATE_REQUEST_SOFT_TIMEOUT_MS', 55000, 10000);
+const UPDATE_REQUEST_RESERVE_MS = getEnvNumber('UPDATE_REQUEST_RESERVE_MS', 4000, 1000);
+const MIN_JOURNAL_BUDGET_MS = getEnvNumber('MIN_JOURNAL_BUDGET_MS', 7000, 1000);
 
 class JournalTimeoutError extends Error {
     constructor(ms: number) {
@@ -90,6 +94,8 @@ export async function POST(request: Request) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
         async start(controller) {
+            const requestStartedAt = Date.now();
+
             const sendMessage = (msg: object) => {
                 controller.enqueue(encoder.encode(JSON.stringify(msg) + '\n'));
             };
@@ -104,10 +110,17 @@ export async function POST(request: Request) {
             let currentJournalIndex: number | null = null;
             let currentJournalTitle: string | null = null;
             let lastActivityAt = Date.now();
+            let nextIndexOverride: number | null = null;
+            let stoppedByBudget = false;
 
             const emit = (msg: object) => {
                 lastActivityAt = Date.now();
                 sendMessage(msg);
+            };
+
+            const getRemainingBudgetMs = () => {
+                const elapsed = Date.now() - requestStartedAt;
+                return Math.max(0, UPDATE_REQUEST_SOFT_TIMEOUT_MS - elapsed);
             };
 
             emit({
@@ -136,10 +149,26 @@ export async function POST(request: Request) {
 
             try {
                 for (let i = 0; i < batch.length; i++) {
+                    const remainingBudgetMs = getRemainingBudgetMs();
+                    const budgetForJournalMs = remainingBudgetMs - UPDATE_REQUEST_RESERVE_MS;
+                    if (budgetForJournalMs < MIN_JOURNAL_BUDGET_MS) {
+                        stoppedByBudget = true;
+                        nextIndexOverride = startIndex + i;
+                        emit({
+                            type: 'task_budget_exhausted',
+                            index: startIndex + i + 1,
+                            remainingBudgetMs,
+                            reserveMs: UPDATE_REQUEST_RESERVE_MS,
+                            message: 'Pausing this batch to avoid platform timeout'
+                        });
+                        break;
+                    }
+
                     const globalIndex = startIndex + i + 1;
                     const follow = batch[i];
                     const journal = follow.journal;
                     const issn = journal.printIssn || journal.eIssn;
+                    const journalTimeoutMs = Math.min(JOURNAL_PROCESS_TIMEOUT_MS, budgetForJournalMs);
 
                     currentJournalIndex = globalIndex;
                     currentJournalTitle = journal.title;
@@ -247,7 +276,7 @@ export async function POST(request: Request) {
                                 processedWorks,
                                 totalWorks
                             };
-                        }, JOURNAL_PROCESS_TIMEOUT_MS, () => abortController.abort());
+                        }, journalTimeoutMs, () => abortController.abort());
 
                         completedJournals++;
                         doneJournals++;
@@ -274,7 +303,7 @@ export async function POST(request: Request) {
                                 type: 'journal_timeout',
                                 index: globalIndex,
                                 journal: journal.title,
-                                timeoutMs: JOURNAL_PROCESS_TIMEOUT_MS,
+                                timeoutMs: journalTimeoutMs,
                                 completedJournals,
                                 totalJournals
                             });
@@ -283,7 +312,7 @@ export async function POST(request: Request) {
                                 status: 'timeout',
                                 index: globalIndex,
                                 journal: journal.title,
-                                timeoutMs: JOURNAL_PROCESS_TIMEOUT_MS,
+                                timeoutMs: journalTimeoutMs,
                                 durationMs: Date.now() - journalStartedAt,
                                 completedJournals,
                                 totalJournals
@@ -305,7 +334,8 @@ export async function POST(request: Request) {
                     }
                 }
 
-                const hasMore = endIndex < totalJournals;
+                const computedNextIndex = nextIndexOverride ?? endIndex;
+                const hasMore = computedNextIndex < totalJournals;
                 const isComplete = !hasMore;
 
                 // Update last check time only when fully complete
@@ -318,8 +348,9 @@ export async function POST(request: Request) {
 
                 emit({
                     type: 'task_complete',
-                    nextIndex: hasMore ? endIndex : null,
+                    nextIndex: hasMore ? computedNextIndex : null,
                     hasMore,
+                    stoppedByBudget,
                     totalJournals,
                     batchSize: batch.length,
                     completedJournals,
@@ -329,7 +360,9 @@ export async function POST(request: Request) {
                     timeoutJournals,
                     totalNewArticles,
                     message: hasMore
-                        ? `Batch complete (${totalNewArticles} new). Continuing...`
+                        ? (stoppedByBudget
+                            ? `Batch paused before timeout (${totalNewArticles} new). Continuing...`
+                            : `Batch complete (${totalNewArticles} new). Continuing...`)
                         : `Update complete. Found ${totalNewArticles} new articles.`
                 });
 
@@ -345,9 +378,18 @@ export async function POST(request: Request) {
             }
 
             if (emailPayload) {
-                void sendNewArticlesEmailForUser(emailPayload.articles, emailPayload.settings).catch((emailError) => {
-                    console.error('Failed to send update email', emailError);
-                });
+                const sendPromise = sendNewArticlesEmailForUser(emailPayload.articles, emailPayload.settings)
+                    .catch((emailError) => {
+                        console.error('Failed to send update email', emailError);
+                    });
+
+                try {
+                    after(async () => {
+                        await sendPromise;
+                    });
+                } catch {
+                    void sendPromise;
+                }
             }
         }
     });

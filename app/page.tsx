@@ -58,6 +58,8 @@ type StreamMessage = {
   [key: string]: unknown;
 };
 
+type UpdateRunState = 'idle' | 'running' | 'completed' | 'interrupted' | 'failed';
+
 export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,7 @@ export default function Dashboard() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
+  const [updateRunState, setUpdateRunState] = useState<UpdateRunState>('idle');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -136,6 +139,7 @@ export default function Dashboard() {
 
   const checkForUpdates = async () => {
     setCheckingUpdates(true);
+    setUpdateRunState('running');
     setUpdateProgress([]);
     setUpdateMetrics(initialMetrics);
     setLastEventAt(Date.now());
@@ -162,6 +166,7 @@ export default function Dashboard() {
       let buffer = '';
       let nextIndex: number | null = null;
       let hasMore = false;
+      let gotTaskComplete = false;
 
       const handleMessage = (msg: StreamMessage) => {
         setLastEventAt(Date.now());
@@ -210,6 +215,12 @@ export default function Dashboard() {
           return;
         }
 
+        if (msg.type === 'task_budget_exhausted') {
+          const index = Number(msg.index || 0);
+          appendProgress(`Approaching request timeout, pausing before journal ${index}...`);
+          return;
+        }
+
         if (msg.type === 'journal_done') {
           const index = Number(msg.index || 0);
           const journal = String(msg.journal || 'Unknown Journal');
@@ -244,6 +255,7 @@ export default function Dashboard() {
         }
 
         if (msg.type === 'task_complete') {
+          gotTaskComplete = true;
           const doneJournals = Number(msg.doneJournals || 0);
           const skippedJournals = Number(msg.skippedJournals || 0);
           const errorJournals = Number(msg.errorJournals || 0);
@@ -309,6 +321,14 @@ export default function Dashboard() {
         }
       }
 
+      if (!gotTaskComplete) {
+        throw new Error('Update stream interrupted before completion');
+      }
+
+      if (hasMore && nextIndex === null) {
+        throw new Error('Stream requested continuation but nextIndex is missing');
+      }
+
       if (hasMore && nextIndex !== null) {
         await processBatch(nextIndex);
       }
@@ -317,8 +337,14 @@ export default function Dashboard() {
     try {
       await processBatch(0);
       await fetchArticles();
+      setUpdateRunState('completed');
     } catch (e) {
-      appendProgress('Failed to check for updates');
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      const interrupted = message.toLowerCase().includes('interrupted');
+      setUpdateRunState(interrupted ? 'interrupted' : 'failed');
+      appendProgress(interrupted
+        ? 'Update stream was interrupted unexpectedly. Please retry.'
+        : 'Failed to check for updates');
       console.error(e);
     } finally {
       setCheckingUpdates(false);
@@ -381,6 +407,16 @@ export default function Dashboard() {
   const subProgressPercent = updateMetrics.currentJournalTotalWorks > 0
     ? Math.min(100, Math.round((updateMetrics.currentJournalProcessedWorks / updateMetrics.currentJournalTotalWorks) * 100))
     : 0;
+
+  const statusText = checkingUpdates
+    ? 'Running'
+    : (updateRunState === 'completed'
+      ? 'Completed'
+      : updateRunState === 'interrupted'
+        ? 'Interrupted'
+        : updateRunState === 'failed'
+          ? 'Failed'
+          : 'Idle');
 
   return (
     <div className="space-y-6">
@@ -458,49 +494,62 @@ export default function Dashboard() {
 
       {updateProgress.length > 0 && (
         <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto shadow-inner">
-          {checkingUpdates && (
-            <div className="mb-4 space-y-3">
-              <div>
-                <div className="flex justify-between text-xs text-gray-300 mb-1">
-                  <span>Journal progress</span>
-                  <span>{updateMetrics.completedJournals}/{Math.max(updateMetrics.totalJournals, 1)}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${mainProgressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-gray-300 mb-1">
-                  <span>
-                    Current journal: {updateMetrics.currentJournalIndex ? `[${updateMetrics.currentJournalIndex}] ` : ''}
-                    {updateMetrics.currentJournalTitle || 'Waiting...'}
-                  </span>
-                  <span>{updateMetrics.currentJournalProcessedWorks}/{updateMetrics.currentJournalTotalWorks}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-cyan-500 to-blue-400 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${subProgressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="text-xs text-gray-400">
-                done: {updateMetrics.doneJournals} | skipped: {updateMetrics.skippedJournals} | errors: {updateMetrics.errorJournals} | timeouts: {updateMetrics.timeoutJournals}
-              </div>
-
-              {isStalled && (
-                <div className="flex items-center text-amber-300 text-xs gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>No new update events for {stallSeconds}s. Still running and waiting for backend work.</span>
-                </div>
-              )}
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-300">Update status</span>
+              <span
+                className={
+                  updateRunState === 'failed' || updateRunState === 'interrupted'
+                    ? 'text-red-300'
+                    : updateRunState === 'completed'
+                      ? 'text-emerald-300'
+                      : 'text-cyan-300'
+                }
+              >
+                {statusText}
+              </span>
             </div>
-          )}
+
+            <div>
+              <div className="flex justify-between text-xs text-gray-300 mb-1">
+                <span>Journal progress</span>
+                <span>{updateMetrics.completedJournals}/{Math.max(updateMetrics.totalJournals, 1)}</span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${mainProgressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs text-gray-300 mb-1">
+                <span>
+                  Current journal: {updateMetrics.currentJournalIndex ? `[${updateMetrics.currentJournalIndex}] ` : ''}
+                  {updateMetrics.currentJournalTitle || 'Waiting...'}
+                </span>
+                <span>{updateMetrics.currentJournalProcessedWorks}/{updateMetrics.currentJournalTotalWorks}</span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-cyan-500 to-blue-400 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${subProgressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-400">
+              done: {updateMetrics.doneJournals} | skipped: {updateMetrics.skippedJournals} | errors: {updateMetrics.errorJournals} | timeouts: {updateMetrics.timeoutJournals}
+            </div>
+
+            {isStalled && checkingUpdates && (
+              <div className="flex items-center text-amber-300 text-xs gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>No new update events for {stallSeconds}s. Still running and waiting for backend work.</span>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-1 font-mono text-sm">
             {updateProgress.map((msg, idx) => (
