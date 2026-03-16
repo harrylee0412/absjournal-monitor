@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { RefreshCw, Download, CheckCircle, Circle, ExternalLink, Search, AlertCircle } from 'lucide-react';
@@ -52,6 +52,9 @@ const initialMetrics: UpdateMetrics = {
 };
 
 const STALL_THRESHOLD_MS = 10000;
+const UPDATE_CHECKPOINT_KEY = 'journal-monitor:update-checkpoint:v1';
+const MAX_AUTO_RETRIES = 1;
+const AUTO_RETRY_DELAY_MS = 1500;
 
 type StreamMessage = {
   type: string;
@@ -76,6 +79,29 @@ export default function Dashboard() {
   const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
   const [updateRunState, setUpdateRunState] = useState<UpdateRunState>('idle');
+  const resumeIndexRef = useRef(0);
+
+  const readCheckpoint = () => {
+    if (typeof window === 'undefined') return 0;
+    const raw = window.localStorage.getItem(UPDATE_CHECKPOINT_KEY);
+    if (!raw) return 0;
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return parsed;
+  };
+
+  const writeCheckpoint = (nextIndex: number | null) => {
+    if (typeof window === 'undefined') return;
+    if (nextIndex === null || nextIndex <= 0) {
+      window.localStorage.removeItem(UPDATE_CHECKPOINT_KEY);
+      return;
+    }
+    window.localStorage.setItem(UPDATE_CHECKPOINT_KEY, String(nextIndex));
+  };
+
+  const sleep = (ms: number) => new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -138,13 +164,24 @@ export default function Dashboard() {
   };
 
   const checkForUpdates = async () => {
+    const savedCheckpoint = readCheckpoint();
+    let runStartIndex = savedCheckpoint > 0 ? savedCheckpoint : 0;
+
     setCheckingUpdates(true);
     setUpdateRunState('running');
     setUpdateProgress([]);
-    setUpdateMetrics(initialMetrics);
+    setUpdateMetrics({
+      ...initialMetrics,
+      completedJournals: runStartIndex
+    });
     setLastEventAt(Date.now());
     setStallSeconds(0);
     setIsStalled(false);
+    resumeIndexRef.current = runStartIndex;
+
+    if (runStartIndex > 0) {
+      appendProgress(`Detected unfinished update. Resuming from journal ${runStartIndex + 1}...`);
+    }
 
     const processBatch = async (startIndex: number): Promise<void> => {
       const response = await fetch('/api/check-updates', {
@@ -174,10 +211,18 @@ export default function Dashboard() {
 
         if (msg.type === 'task_start') {
           const totalJournals = Number(msg.totalJournals || 0);
+          const startIndex = Number(msg.startIndex || 0);
+          const clampedStart = totalJournals > 0
+            ? Math.min(startIndex, totalJournals)
+            : startIndex;
+
           setUpdateMetrics(prev => ({
             ...prev,
-            totalJournals: totalJournals || prev.totalJournals
+            totalJournals: totalJournals || prev.totalJournals,
+            completedJournals: Math.max(prev.completedJournals, clampedStart)
           }));
+          resumeIndexRef.current = clampedStart;
+          writeCheckpoint(clampedStart > 0 ? clampedStart : null);
           appendProgress(`Starting update for ${totalJournals} journals...`);
           return;
         }
@@ -247,6 +292,10 @@ export default function Dashboard() {
             return next;
           });
 
+          const checkpoint = Math.max(0, completedJournals);
+          resumeIndexRef.current = checkpoint;
+          writeCheckpoint(checkpoint > 0 ? checkpoint : null);
+
           if (status === 'done') appendProgress(`[${index}] ${journal}: ${newArticles} new`);
           if (status === 'skip') appendProgress(`[${index}] ${journal}: skipped`);
           if (status === 'error') appendProgress(`[${index}] ${journal}: failed`);
@@ -277,6 +326,9 @@ export default function Dashboard() {
 
           hasMore = Boolean(msg.hasMore);
           nextIndex = typeof msg.nextIndex === 'number' ? msg.nextIndex : null;
+          const checkpoint = hasMore && nextIndex !== null ? nextIndex : null;
+          resumeIndexRef.current = checkpoint ?? 0;
+          writeCheckpoint(checkpoint);
 
           if (!hasMore) {
             appendProgress(`All done. Found ${totalNewArticles} new articles.`);
@@ -335,7 +387,27 @@ export default function Dashboard() {
     };
 
     try {
-      await processBatch(0);
+      let retryCount = 0;
+      while (true) {
+        try {
+          await processBatch(runStartIndex);
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          const interrupted = message.toLowerCase().includes('interrupted');
+
+          if (interrupted && retryCount < MAX_AUTO_RETRIES) {
+            retryCount += 1;
+            runStartIndex = Math.max(0, resumeIndexRef.current);
+            appendProgress(`Stream interrupted. Auto-retrying (${retryCount}/${MAX_AUTO_RETRIES}) from journal ${runStartIndex + 1}...`);
+            await sleep(AUTO_RETRY_DELAY_MS);
+            continue;
+          }
+
+          throw error;
+        }
+      }
+
       await fetchArticles();
       setUpdateRunState('completed');
     } catch (e) {
