@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { RefreshCw, Download, CheckCircle, Circle, ExternalLink } from 'lucide-react';
+import { RefreshCw, Download, CheckCircle, Circle, ExternalLink, Search, AlertCircle } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -14,29 +14,89 @@ interface Article {
   url: string | null;
   publicationDate: string | null;
   isRead: boolean;
+  score?: number;
   journal: {
     title: string;
   };
 }
+
+type SearchMode = 'hybrid' | 'fts' | 'trigram';
+type SortMode = 'relevance' | 'date_desc';
+
+interface UpdateMetrics {
+  totalJournals: number;
+  completedJournals: number;
+  doneJournals: number;
+  skippedJournals: number;
+  errorJournals: number;
+  timeoutJournals: number;
+  totalNewArticles: number;
+  currentJournalIndex: number | null;
+  currentJournalTitle: string | null;
+  currentJournalProcessedWorks: number;
+  currentJournalTotalWorks: number;
+}
+
+const initialMetrics: UpdateMetrics = {
+  totalJournals: 0,
+  completedJournals: 0,
+  doneJournals: 0,
+  skippedJournals: 0,
+  errorJournals: 0,
+  timeoutJournals: 0,
+  totalNewArticles: 0,
+  currentJournalIndex: null,
+  currentJournalTitle: null,
+  currentJournalProcessedWorks: 0,
+  currentJournalTotalWorks: 0
+};
+
+const STALL_THRESHOLD_MS = 10000;
+
+type StreamMessage = {
+  type: string;
+  [key: string]: unknown;
+};
 
 export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<string[]>([]);
+  const [updateMetrics, setUpdateMetrics] = useState<UpdateMetrics>(initialMetrics);
+  const [lastEventAt, setLastEventAt] = useState<number | null>(null);
+  const [stallSeconds, setStallSeconds] = useState(0);
+  const [isStalled, setIsStalled] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(true);
   const [selectedArticles, setSelectedArticles] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
+  const [sortMode, setSortMode] = useState<SortMode>('relevance');
 
   useEffect(() => {
-    fetchArticles();
-  }, [unreadOnly]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 350);
 
-  const fetchArticles = async () => {
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchArticles = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/articles', {
-        params: { unread: unreadOnly, limit: 100 }
-      });
+      const params: Record<string, string | number | boolean> = {
+        unread: unreadOnly,
+        limit: 100
+      };
+
+      if (debouncedSearch) {
+        params.q = debouncedSearch;
+        params.searchMode = searchMode;
+        params.sort = sortMode;
+      }
+
+      const res = await axios.get('/api/articles', { params });
       setArticles(res.data.data);
     } catch (e) {
       if (axios.isAxiosError(e) && e.response?.status === 401) {
@@ -47,15 +107,41 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  }, [debouncedSearch, searchMode, sortMode, unreadOnly]);
+
+  useEffect(() => {
+    fetchArticles();
+  }, [fetchArticles]);
+
+  useEffect(() => {
+    if (!checkingUpdates) {
+      setIsStalled(false);
+      setStallSeconds(0);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      if (!lastEventAt) return;
+      const idleMs = Date.now() - lastEventAt;
+      setStallSeconds(Math.floor(idleMs / 1000));
+      setIsStalled(idleMs > STALL_THRESHOLD_MS);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [checkingUpdates, lastEventAt]);
+
+  const appendProgress = (message: string) => {
+    setUpdateProgress(prev => [...prev, message]);
   };
 
   const checkForUpdates = async () => {
     setCheckingUpdates(true);
     setUpdateProgress([]);
+    setUpdateMetrics(initialMetrics);
+    setLastEventAt(Date.now());
+    setStallSeconds(0);
+    setIsStalled(false);
 
-    let totalNewArticles = 0;
-
-    // Recursive function to process batches
     const processBatch = async (startIndex: number): Promise<void> => {
       const response = await fetch('/api/check-updates', {
         method: 'POST',
@@ -68,60 +154,161 @@ export default function Dashboard() {
       }
 
       const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
       if (!reader) {
         throw new Error('No response body');
       }
 
+      const decoder = new TextDecoder();
+      let buffer = '';
       let nextIndex: number | null = null;
       let hasMore = false;
+
+      const handleMessage = (msg: StreamMessage) => {
+        setLastEventAt(Date.now());
+        setIsStalled(false);
+
+        if (msg.type === 'task_start') {
+          const totalJournals = Number(msg.totalJournals || 0);
+          setUpdateMetrics(prev => ({
+            ...prev,
+            totalJournals: totalJournals || prev.totalJournals
+          }));
+          appendProgress(`Starting update for ${totalJournals} journals...`);
+          return;
+        }
+
+        if (msg.type === 'journal_start') {
+          const index = Number(msg.index || 0);
+          const journal = String(msg.journal || 'Unknown Journal');
+
+          setUpdateMetrics(prev => ({
+            ...prev,
+            currentJournalIndex: index,
+            currentJournalTitle: journal,
+            currentJournalProcessedWorks: 0,
+            currentJournalTotalWorks: 0
+          }));
+          appendProgress(`[${index}] Checking ${journal}...`);
+          return;
+        }
+
+        if (msg.type === 'journal_progress') {
+          const processedWorks = Number(msg.processedWorks || 0);
+          const totalWorks = Number(msg.totalWorks || 0);
+          setUpdateMetrics(prev => ({
+            ...prev,
+            currentJournalProcessedWorks: processedWorks,
+            currentJournalTotalWorks: totalWorks
+          }));
+          return;
+        }
+
+        if (msg.type === 'journal_timeout') {
+          const index = Number(msg.index || 0);
+          const journal = String(msg.journal || 'Unknown Journal');
+          appendProgress(`[${index}] ${journal}: timeout, skipped`);
+          return;
+        }
+
+        if (msg.type === 'journal_done') {
+          const index = Number(msg.index || 0);
+          const journal = String(msg.journal || 'Unknown Journal');
+          const status = String(msg.status || 'done');
+          const newArticles = Number(msg.newArticles || 0);
+          const completedJournals = Number(msg.completedJournals || 0);
+          const totalJournals = Number(msg.totalJournals || updateMetrics.totalJournals);
+          const processedWorks = Number(msg.processedWorks || 0);
+          const totalWorks = Number(msg.totalWorks || 0);
+
+          setUpdateMetrics(prev => {
+            const next = { ...prev };
+            next.completedJournals = Math.max(prev.completedJournals, completedJournals);
+            if (totalJournals > 0) next.totalJournals = totalJournals;
+            next.totalNewArticles = prev.totalNewArticles + (status === 'done' ? newArticles : 0);
+            next.currentJournalProcessedWorks = Math.max(prev.currentJournalProcessedWorks, processedWorks);
+            next.currentJournalTotalWorks = Math.max(prev.currentJournalTotalWorks, totalWorks);
+
+            if (status === 'done') next.doneJournals += 1;
+            if (status === 'skip') next.skippedJournals += 1;
+            if (status === 'error') next.errorJournals += 1;
+            if (status === 'timeout') next.timeoutJournals += 1;
+
+            return next;
+          });
+
+          if (status === 'done') appendProgress(`[${index}] ${journal}: ${newArticles} new`);
+          if (status === 'skip') appendProgress(`[${index}] ${journal}: skipped`);
+          if (status === 'error') appendProgress(`[${index}] ${journal}: failed`);
+          if (status === 'timeout') appendProgress(`[${index}] ${journal}: timeout`);
+          return;
+        }
+
+        if (msg.type === 'task_complete') {
+          const doneJournals = Number(msg.doneJournals || 0);
+          const skippedJournals = Number(msg.skippedJournals || 0);
+          const errorJournals = Number(msg.errorJournals || 0);
+          const timeoutJournals = Number(msg.timeoutJournals || 0);
+          const completedJournals = Number(msg.completedJournals || 0);
+          const totalNewArticles = Number(msg.totalNewArticles || 0);
+          const totalJournals = Number(msg.totalJournals || updateMetrics.totalJournals);
+
+          setUpdateMetrics(prev => ({
+            ...prev,
+            totalJournals: totalJournals || prev.totalJournals,
+            completedJournals: Math.max(prev.completedJournals, completedJournals),
+            doneJournals: Math.max(prev.doneJournals, doneJournals),
+            skippedJournals: Math.max(prev.skippedJournals, skippedJournals),
+            errorJournals: Math.max(prev.errorJournals, errorJournals),
+            timeoutJournals: Math.max(prev.timeoutJournals, timeoutJournals),
+            totalNewArticles: Math.max(prev.totalNewArticles, totalNewArticles)
+          }));
+
+          hasMore = Boolean(msg.hasMore);
+          nextIndex = typeof msg.nextIndex === 'number' ? msg.nextIndex : null;
+
+          if (!hasMore) {
+            appendProgress(`All done. Found ${totalNewArticles} new articles.`);
+          } else {
+            appendProgress(`Batch done. Continuing from journal ${Number(nextIndex || 0) + 1}...`);
+          }
+          return;
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const text = decoder.decode(value);
-        const lines = text.split('\n').filter(line => line.trim());
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
-          try {
-            const msg = JSON.parse(line);
+          const trimmed = line.trim();
+          if (!trimmed) continue;
 
-            if (msg.type === 'batch_start') {
-              setUpdateProgress(prev => [...prev, `📚 ${msg.message}`]);
-            } else if (msg.type === 'checking') {
-              setUpdateProgress(prev => [...prev, `🔍 [${msg.index}] Checking ${msg.journal}...`]);
-            } else if (msg.type === 'done') {
-              const icon = msg.newArticles > 0 ? '✅' : '⏸️';
-              setUpdateProgress(prev => {
-                const newArr = [...prev];
-                newArr[newArr.length - 1] = `${icon} [${msg.index}] ${msg.journal}: ${msg.newArticles} new`;
-                return newArr;
-              });
-              totalNewArticles += msg.newArticles;
-            } else if (msg.type === 'error') {
-              setUpdateProgress(prev => {
-                const newArr = [...prev];
-                newArr[newArr.length - 1] = `❌ [${msg.index}] ${msg.journal}: Failed`;
-                return newArr;
-              });
-            } else if (msg.type === 'skip') {
-              setUpdateProgress(prev => [...prev, `⏭️ [${msg.index}] ${msg.journal}: Skipped (${msg.reason})`]);
-            } else if (msg.type === 'batch_complete') {
-              nextIndex = msg.nextIndex;
-              hasMore = msg.hasMore;
-              if (!hasMore) {
-                setUpdateProgress(prev => [...prev, `🎉 All done! Found ${totalNewArticles} new articles total.`]);
-              }
-            }
+          try {
+            const msg = JSON.parse(trimmed) as StreamMessage;
+            handleMessage(msg);
           } catch {
-            // Ignore parse errors
+            // Ignore malformed line and continue processing stream.
           }
         }
       }
 
-      // If there are more journals, continue with next batch
+      const flushText = decoder.decode();
+      if (flushText) buffer += flushText;
+      if (buffer.trim()) {
+        try {
+          const msg = JSON.parse(buffer.trim()) as StreamMessage;
+          handleMessage(msg);
+        } catch {
+          // Ignore malformed tail.
+        }
+      }
+
       if (hasMore && nextIndex !== null) {
         await processBatch(nextIndex);
       }
@@ -129,23 +316,23 @@ export default function Dashboard() {
 
     try {
       await processBatch(0);
-      fetchArticles();
+      await fetchArticles();
     } catch (e) {
-      setUpdateProgress(prev => [...prev, '❌ Failed to check for updates']);
+      appendProgress('Failed to check for updates');
       console.error(e);
     } finally {
       setCheckingUpdates(false);
+      setIsStalled(false);
+      setStallSeconds(0);
     }
   };
 
   const toggleReadStatus = async (id: number, current: boolean) => {
-    // Optimistic
     setArticles(prev => prev.map(a => a.id === id ? { ...a, isRead: !current } : a));
     try {
       await axios.put('/api/articles', { ids: [id], isRead: !current });
     } catch (e) {
       console.error(e);
-      // revert could go here
     }
   };
 
@@ -157,11 +344,11 @@ export default function Dashboard() {
 
   const exportRis = () => {
     const subset = articles.filter(a => selectedArticles.includes(a.id));
-    if (subset.length === 0) return alert("Select articles to export");
+    if (subset.length === 0) return alert('Select articles to export');
 
-    let risContent = "";
+    let risContent = '';
     subset.forEach(a => {
-      risContent += "TY  - JOUR\n";
+      risContent += 'TY  - JOUR\n';
       risContent += `TI  - ${a.title}\n`;
       if (a.authors) {
         a.authors.split(', ').forEach(au => {
@@ -176,7 +363,7 @@ export default function Dashboard() {
         const d = new Date(a.publicationDate);
         risContent += `PY  - ${d.getFullYear()}\n`;
       }
-      risContent += "ER  - \n\n";
+      risContent += 'ER  - \n\n';
     });
 
     const blob = new Blob([risContent], { type: 'text/plain' });
@@ -186,6 +373,14 @@ export default function Dashboard() {
     link.download = 'articles.ris';
     link.click();
   };
+
+  const mainProgressPercent = updateMetrics.totalJournals > 0
+    ? Math.min(100, Math.round((updateMetrics.completedJournals / updateMetrics.totalJournals) * 100))
+    : 0;
+
+  const subProgressPercent = updateMetrics.currentJournalTotalWorks > 0
+    ? Math.min(100, Math.round((updateMetrics.currentJournalProcessedWorks / updateMetrics.currentJournalTotalWorks) * 100))
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -215,26 +410,98 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Progress Display */}
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search existing articles by keyword..."
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={searchMode}
+            onChange={e => setSearchMode(e.target.value as SearchMode)}
+            className="block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md bg-white text-black border"
+          >
+            <option value="hybrid">Search: Hybrid (FTS + fuzzy)</option>
+            <option value="fts">Search: FTS only</option>
+            <option value="trigram">Search: Fuzzy only</option>
+          </select>
+
+          <select
+            value={sortMode}
+            onChange={e => setSortMode(e.target.value as SortMode)}
+            className="block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md bg-white text-black border"
+          >
+            <option value="relevance">Sort: Relevance</option>
+            <option value="date_desc">Sort: Newest first</option>
+          </select>
+
+          <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={e => setUnreadOnly(e.target.checked)}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span>Show Unread Only</span>
+          </label>
+        </div>
+      </div>
+
       {updateProgress.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4 max-h-80 overflow-y-auto shadow-inner">
-          {/* Progress Bar */}
+        <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto shadow-inner">
           {checkingUpdates && (
-            <div className="mb-3">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>Updating journals...</span>
-                <span>{updateProgress.filter(m => m.includes('[') && !m.includes('Checking')).length} completed</span>
+            <div className="mb-4 space-y-3">
+              <div>
+                <div className="flex justify-between text-xs text-gray-300 mb-1">
+                  <span>Journal progress</span>
+                  <span>{updateMetrics.completedJournals}/{Math.max(updateMetrics.totalJournals, 1)}</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${mainProgressPercent}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
-                  style={{
-                    width: `${Math.min(100, (updateProgress.filter(m => m.includes('[') && !m.includes('Checking')).length / Math.max(1, updateProgress.filter(m => m.includes('[')).length)) * 100)}%`
-                  }}
-                />
+
+              <div>
+                <div className="flex justify-between text-xs text-gray-300 mb-1">
+                  <span>
+                    Current journal: {updateMetrics.currentJournalIndex ? `[${updateMetrics.currentJournalIndex}] ` : ''}
+                    {updateMetrics.currentJournalTitle || 'Waiting...'}
+                  </span>
+                  <span>{updateMetrics.currentJournalProcessedWorks}/{updateMetrics.currentJournalTotalWorks}</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-blue-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${subProgressPercent}%` }}
+                  />
+                </div>
               </div>
+
+              <div className="text-xs text-gray-400">
+                done: {updateMetrics.doneJournals} | skipped: {updateMetrics.skippedJournals} | errors: {updateMetrics.errorJournals} | timeouts: {updateMetrics.timeoutJournals}
+              </div>
+
+              {isStalled && (
+                <div className="flex items-center text-amber-300 text-xs gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>No new update events for {stallSeconds}s. Still running and waiting for backend work.</span>
+                </div>
+              )}
             </div>
           )}
+
           <div className="space-y-1 font-mono text-sm">
             {updateProgress.map((msg, idx) => (
               <div key={idx} className="text-green-400">{msg}</div>
@@ -243,22 +510,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="flex items-center space-x-4">
-        <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
-          <input
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={e => setUnreadOnly(e.target.checked)}
-            className="rounded border-gray-300 text-primary focus:ring-primary"
-          />
-          <span>Show Unread Only</span>
-        </label>
-      </div>
-
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
           {articles.length === 0 && !loading && (
-            <li className="p-12 text-center text-gray-500">No articles found. Try following more journals or checking updates.</li>
+            <li className="p-12 text-center text-gray-500">No articles found. Try adjusting filters, keywords, or checking updates.</li>
           )}
           {articles.map((article) => (
             <li key={article.id} className={`hover:bg-gray-50 transition-colors ${article.isRead ? 'opacity-60 bg-gray-50' : 'bg-white'}`}>
@@ -289,7 +544,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleReadStatus(article.id, article.isRead)}
                       className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600"
-                      title={article.isRead ? "Mark as Unread" : "Mark as Read"}
+                      title={article.isRead ? 'Mark as Unread' : 'Mark as Read'}
                     >
                       {article.isRead ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Circle className="w-5 h-5" />}
                     </button>
@@ -303,7 +558,7 @@ export default function Dashboard() {
                   </div>
                   {article.abstract && (
                     <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                      {/* <span className="truncate max-w-xs">{article.abstract}</span> */}
+                      {/* Reserved for future abstract preview toggle. */}
                     </div>
                   )}
                 </div>

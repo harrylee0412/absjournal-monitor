@@ -27,9 +27,14 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+.archive/
 
 # Prisma
 prisma/migrations/
+!prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/20260316090000_add_article_search_indexes/
+!prisma/migrations/20260316090000_add_article_search_indexes/migration.sql
 
 # Vercel
 .vercel
