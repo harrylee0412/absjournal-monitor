@@ -171,55 +171,93 @@ export default function SettingsPage() {
 
                 <div className="border-t border-gray-200 pt-6">
                     <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">SMTP Configuration</h3>
-                    <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                        <div className="sm:col-span-4">
-                            <label className="block text-sm font-medium text-gray-700">SMTP Host</label>
-                            <input
-                                type="text"
-                                value={smtpHost}
-                                onChange={e => setSmtpHost(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                                placeholder="smtp.gmail.com"
-                            />
+                    <p className="text-xs text-gray-500 mb-4">
+                        如需按邮箱服务商配置 SMTP，请参考以下官方教程：
+                        {' '}
+                        <a href="https://support.google.com/mail/answer/7126229?hl=en" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">Gmail</a>
+                        {' / '}
+                        <a href="https://service.mail.qq.com/detail/0/75" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">QQ Mail</a>
+                        {' / '}
+                        <a href="https://help.mail.163.com/faqDetail.do?code=d7a5dc8471cd0c0e8b4b8f4f8e49998b374173cfe9171305fa1ce630d7f67ac2a5feb28b66796d3b" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">163 Mail</a>
+                        {' / '}
+                        <a href="https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">Outlook</a>
+                    </p>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div className="lg:col-span-3">
+                            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                <div className="sm:col-span-4">
+                                    <label className="block text-sm font-medium text-gray-700">SMTP Host</label>
+                                    <input
+                                        type="text"
+                                        value={smtpHost}
+                                        onChange={e => setSmtpHost(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                        placeholder="smtp.gmail.com"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700">Port</label>
+                                    <input
+                                        type="number"
+                                        value={smtpPort}
+                                        onChange={e => setSmtpPort(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-3">
+                                    <label className="block text-sm font-medium text-gray-700">Username</label>
+                                    <input
+                                        type="text"
+                                        value={smtpUser}
+                                        onChange={e => setSmtpUser(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-3">
+                                    <label className="block text-sm font-medium text-gray-700">Password</label>
+                                    <input
+                                        type="password"
+                                        value={smtpPass}
+                                        onChange={e => setSmtpPass(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                    />
+                                </div>
+                                <div className="sm:col-span-6">
+                                    <label className="block text-sm font-medium text-gray-700">From Email</label>
+                                    <input
+                                        type="text"
+                                        value={fromEmail}
+                                        onChange={e => setFromEmail(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Port</label>
-                            <input
-                                type="number"
-                                value={smtpPort}
-                                onChange={e => setSmtpPort(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                            />
-                        </div>
+                        <div className="lg:col-span-2">
+                            <div className="rounded-md border border-blue-200 bg-blue-50 p-4 space-y-4">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-blue-900">Common SMTP Presets</h4>
+                                    <p className="text-xs text-blue-800 mt-1">Use app password/authorization code, not mailbox login password.</p>
+                                </div>
 
-                        <div className="sm:col-span-3">
-                            <label className="block text-sm font-medium text-gray-700">Username</label>
-                            <input
-                                type="text"
-                                value={smtpUser}
-                                onChange={e => setSmtpUser(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                            />
-                        </div>
+                                <div className="text-xs text-blue-900 space-y-2">
+                                    <div><span className="font-semibold">Gmail:</span> `smtp.gmail.com` / port `587`</div>
+                                    <div><span className="font-semibold">QQ Mail:</span> `smtp.qq.com` / port `587`</div>
+                                    <div><span className="font-semibold">163 Mail:</span> `smtp.163.com` / port `465` or `994`</div>
+                                    <div><span className="font-semibold">Outlook:</span> `smtp.office365.com` / port `587`</div>
+                                </div>
 
-                        <div className="sm:col-span-3">
-                            <label className="block text-sm font-medium text-gray-700">Password</label>
-                            <input
-                                type="password"
-                                value={smtpPass}
-                                onChange={e => setSmtpPass(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                            />
-                        </div>
-                        <div className="sm:col-span-6">
-                            <label className="block text-sm font-medium text-gray-700">From Email</label>
-                            <input
-                                type="text"
-                                value={fromEmail}
-                                onChange={e => setFromEmail(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                            />
+                                <div className="border-t border-blue-200 pt-3 text-xs text-blue-900 space-y-2">
+                                    <div className="font-semibold">Important</div>
+                                    <div>Do not use `localhost` or `127.0.0.1` as host.</div>
+                                    <div>Set `From Email` to the same sender account when possible.</div>
+                                    <div>If GitHub Actions sends mail, SMTP host must be publicly reachable.</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
