@@ -6,12 +6,12 @@ import { BarChart3, BookOpen, FileText, List, Rss, Settings } from 'lucide-react
 import { UserButton } from '@neondatabase/auth/react';
 
 const navItems = [
-    { href: '/', label: 'Dashboard', icon: BarChart3 },
-    { href: '/papers', label: 'Papers', icon: BookOpen },
-    { href: '/topics', label: 'Topics', icon: Rss },
-    { href: '/journals', label: 'Journals', icon: List },
-    { href: '/reports', label: 'Reports', icon: FileText },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/', label: '研究概览', description: '新增、待读、运行状态', icon: BarChart3 },
+    { href: '/papers', label: '每日论文', description: '查看抓取结果和导出 RIS', icon: BookOpen },
+    { href: '/topics', label: '话题订阅', description: '关键词追踪和命中记录', icon: Rss },
+    { href: '/journals', label: '关注期刊', description: '管理 30 本以内期刊', icon: List },
+    { href: '/reports', label: '每周周报', description: '周一摘要和发送记录', icon: FileText },
+    { href: '/settings', label: '账户设置', description: '邮箱、LLM、Zotero 配置', icon: Settings },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -23,12 +23,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
+        <div className="min-h-screen lg:grid lg:grid-cols-[284px_1fr]">
             <aside className="border-b border-line bg-ink px-5 py-5 text-white lg:min-h-screen lg:border-b-0 lg:border-r">
                 <Link href="/" className="block">
                     <div className="font-serif text-2xl font-semibold">Journal Monitor</div>
                     <div className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-white/55">
-                        Research Feed
+                        每日论文 · 每周话题
                     </div>
                 </Link>
                 <nav className="mt-7 grid gap-1">
@@ -41,15 +41,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                                 href={item.href}
                                 className={`shell-link ${isActive ? 'shell-link-active' : ''}`}
                             >
-                                <Icon className="h-4 w-4" />
-                                <span>{item.label}</span>
+                                <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span className="min-w-0">
+                                    <span className="shell-link-title">{item.label}</span>
+                                    <span className="shell-link-desc">{item.description}</span>
+                                </span>
                             </Link>
                         );
                     })}
                 </nav>
                 <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/70">
                     <div className="font-semibold text-white">个人研究者版</div>
-                    <p className="mt-1 leading-6">话题订阅基于你已关注的 30 本以内期刊生成周报。</p>
+                    <p className="mt-1 leading-6">
+                        每日抓取你关注的期刊；话题周报默认每周一 08:00 UTC（北京时间 16:00）生成。
+                    </p>
                 </div>
             </aside>
             <div className="min-w-0">
@@ -60,7 +65,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                             <button className="btn secondary shrink-0" type="submit">搜索</button>
                         </form>
                         <div className="flex items-center gap-2">
-                            <Link className="btn" href="/topics/new">新建话题</Link>
+                            <Link className="btn" href="/topics/new">新建话题订阅</Link>
                             <UserButton />
                         </div>
                     </div>

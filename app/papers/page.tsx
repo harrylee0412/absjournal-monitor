@@ -541,7 +541,7 @@ export default function Dashboard() {
             className="btn"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${checkingUpdates ? 'animate-spin' : ''}`} />
-            {checkingUpdates ? 'Checking...' : 'Check Updates'}
+            {checkingUpdates ? '抓取中...' : '手动抓取'}
           </button>
           <button
             onClick={exportRis}
@@ -549,7 +549,7 @@ export default function Dashboard() {
             className="btn secondary"
           >
             <Download className="mr-2 h-4 w-4" />
-            Export RIS ({selectedArticles.length})
+            导出 RIS ({selectedArticles.length})
           </button>
         </div>
       </div>
@@ -563,7 +563,7 @@ export default function Dashboard() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search existing articles by keyword..."
+            placeholder="搜索标题、作者、摘要、期刊或关键词..."
             className="input block w-full pl-10"
           />
         </div>
@@ -574,9 +574,9 @@ export default function Dashboard() {
             onChange={e => setSearchMode(e.target.value as SearchMode)}
             className="input max-w-[220px] py-1.5 text-sm"
           >
-            <option value="hybrid">Search: Hybrid (FTS + fuzzy)</option>
-            <option value="fts">Search: FTS only</option>
-            <option value="trigram">Search: Fuzzy only</option>
+            <option value="hybrid">搜索：综合匹配</option>
+            <option value="fts">搜索：全文检索</option>
+            <option value="trigram">搜索：模糊匹配</option>
           </select>
 
           <select
@@ -584,8 +584,8 @@ export default function Dashboard() {
             onChange={e => setSortMode(e.target.value as SortMode)}
             className="input max-w-[180px] py-1.5 text-sm"
           >
-            <option value="relevance">Sort: Relevance</option>
-            <option value="date_desc">Sort: Newest first</option>
+            <option value="relevance">排序：相关度</option>
+            <option value="date_desc">排序：最新优先</option>
           </select>
 
           <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
@@ -595,7 +595,7 @@ export default function Dashboard() {
               onChange={e => setUnreadOnly(e.target.checked)}
               className="rounded border-gray-300 text-primary focus:ring-primary"
             />
-            <span>Show Unread Only</span>
+            <span>只看未读</span>
           </label>
 
           <select
@@ -603,7 +603,7 @@ export default function Dashboard() {
             onChange={e => setTopicId(e.target.value)}
             className="input max-w-[220px] py-1.5 text-sm"
           >
-            <option value="">All Topics</option>
+            <option value="">全部话题</option>
             {topics.map(topic => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
           </select>
 
@@ -614,7 +614,7 @@ export default function Dashboard() {
               onChange={e => setMatchedOnly(e.target.checked)}
               className="rounded border-gray-300 text-primary focus:ring-primary"
             />
-            <span>Matched Only</span>
+            <span>只看话题命中</span>
           </label>
         </div>
       </div>

@@ -53,9 +53,11 @@ export default function NewTopicPage() {
     return (
         <div className="space-y-6">
             <header className="border-b border-line pb-5">
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">New Topic</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Topic Setup</p>
                 <h1 className="font-serif text-4xl font-semibold text-ink">新建话题订阅</h1>
-                <p className="mt-1 text-sage">第一版话题订阅作用于当前已关注的期刊，不单独选择期刊范围。</p>
+                <p className="mt-1 text-sage">
+                    第一版话题订阅作用于当前已关注的期刊；系统默认每周一 08:00 UTC（北京时间 16:00）生成周报。
+                </p>
             </header>
 
             <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -105,7 +107,7 @@ export default function NewTopicPage() {
                         <span className="tag">{journals.length}/30</span>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-sage">
-                        该话题会在你当前关注的期刊中新文章里匹配关键词。需要调整期刊范围时，请到 Journals 页面关注或取消关注。
+                        该话题会在你当前关注的期刊中新文章里匹配关键词。需要调整期刊范围时，请到关注期刊页面关注或取消关注。
                     </p>
                     <div className="mt-4 max-h-[460px] overflow-auto">
                         {journals.length === 0 ? (

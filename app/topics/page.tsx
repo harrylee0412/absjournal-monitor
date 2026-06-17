@@ -39,11 +39,13 @@ export default function TopicsPage() {
         <div className="space-y-6">
             <header className="flex flex-col gap-3 border-b border-line pb-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Saved Topics</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Topic Tracker</p>
                     <h1 className="font-serif text-4xl font-semibold text-ink">话题订阅</h1>
-                    <p className="mt-1 text-sage">在已关注期刊内追踪具体研究话题，并生成每周摘要。</p>
+                    <p className="mt-1 text-sage">
+                        在已关注期刊内追踪具体研究话题，默认每周一 08:00 UTC（北京时间 16:00）生成摘要。
+                    </p>
                 </div>
-                <Link className="btn" href="/topics/new">新建话题</Link>
+                <Link className="btn" href="/topics/new">新建话题订阅</Link>
             </header>
 
             <section className="panel overflow-hidden p-5">
@@ -62,7 +64,7 @@ export default function TopicsPage() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={7}>Loading...</td></tr>
+                                <tr><td colSpan={7}>加载中...</td></tr>
                             ) : topics.length === 0 ? (
                                 <tr><td colSpan={7}>暂无话题订阅。</td></tr>
                             ) : topics.map(topic => (
@@ -78,13 +80,13 @@ export default function TopicsPage() {
                                     </td>
                                     <td>{topic._count?.matches ?? 0}</td>
                                     <td>{topic.translateMode}</td>
-                                    <td>{topic.deliveryEnabled ? 'ON' : 'OFF'}</td>
+                                    <td>{topic.deliveryEnabled ? '开启' : '关闭'}</td>
                                     <td>
                                         {topic.summaryRuns?.[0]
                                             ? `${topic.summaryRuns[0].createdAt.slice(0, 10)} · ${topic.summaryRuns[0].paperCount} 篇`
                                             : '尚未运行'}
                                     </td>
-                                    <td><span className="tag">{topic.enabled ? 'ON' : 'OFF'}</span></td>
+                                    <td><span className="tag">{topic.enabled ? '开启' : '关闭'}</span></td>
                                 </tr>
                             ))}
                         </tbody>

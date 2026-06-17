@@ -130,7 +130,7 @@ button {
 }
 
 .shell-link {
-  align-items: center;
+  align-items: flex-start;
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.74);
   display: flex;
@@ -139,10 +139,29 @@ button {
   padding: 0.7rem 0.8rem;
 }
 
+.shell-link-title {
+  display: block;
+  line-height: 1.25;
+}
+
+.shell-link-desc {
+  color: rgba(255, 255, 255, 0.48);
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.45;
+  margin-top: 0.16rem;
+}
+
 .shell-link:hover,
 .shell-link-active {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.shell-link:hover .shell-link-desc,
+.shell-link-active .shell-link-desc {
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .data-table {

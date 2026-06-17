@@ -129,17 +129,16 @@ export default function JournalsPage() {
                     <h1 className="font-serif text-4xl font-semibold text-ink">期刊关注</h1>
                     <p className="text-sm text-sage mt-1 flex items-center gap-1">
                         <Info className="w-4 h-4" />
-                        You can follow up to 30 journals. Topics use this same journal set.
+                        最多关注 30 本期刊；话题订阅会沿用这组期刊范围。
                     </p>
                 </div>
 
-                {/* Add Custom Journal Button */}
                 <button
                     onClick={() => setShowAddCustom(!showAddCustom)}
                     className="btn"
                 >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Custom Journal
+                    添加自定义期刊
                 </button>
             </div>
 

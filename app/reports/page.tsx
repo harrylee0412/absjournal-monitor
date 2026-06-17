@@ -32,9 +32,9 @@ export default function ReportsPage() {
     return (
         <div className="space-y-6">
             <header className="border-b border-line pb-5">
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Weekly Reports</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Weekly Digest</p>
                 <h1 className="font-serif text-4xl font-semibold text-ink">周报历史</h1>
-                <p className="mt-1 text-sage">每周话题摘要和邮件发送记录。</p>
+                <p className="mt-1 text-sage">每周一 08:00 UTC（北京时间 16:00）自动生成话题摘要，并记录邮件发送状态。</p>
             </header>
 
             <section className="panel overflow-hidden p-5">
@@ -52,7 +52,7 @@ export default function ReportsPage() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={6}>Loading...</td></tr>
+                                <tr><td colSpan={6}>加载中...</td></tr>
                             ) : reports.length === 0 ? (
                                 <tr><td colSpan={6}>暂无周报。</td></tr>
                             ) : reports.map(report => (

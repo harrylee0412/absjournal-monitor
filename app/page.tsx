@@ -62,7 +62,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link className="btn secondary" href="/papers">查看论文</Link>
-          <Link className="btn" href="/topics/new">新建话题</Link>
+          <Link className="btn" href="/topics/new">新建话题订阅</Link>
         </div>
       </header>
 
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
           <section className="panel p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="font-serif text-2xl font-semibold">最近论文</h2>
-              <Link className="btn secondary" href="/papers">进入 Papers</Link>
+              <Link className="btn secondary" href="/papers">进入每日论文</Link>
             </div>
             <div className="grid gap-3">
               {recentArticles.length === 0 ? (
@@ -112,6 +112,10 @@ export default async function DashboardPage() {
                 <div className="mt-1 font-semibold text-ink">
                   {settings?.lastCheckTime ? settings.lastCheckTime.toISOString().slice(0, 10) : '尚未完成'}
                 </div>
+              </div>
+              <div className="rounded-lg border border-line bg-white/70 p-3">
+                <div className="label">每周话题周报</div>
+                <div className="mt-1 font-semibold text-ink">每周一 08:00 UTC（北京时间 16:00）自动生成</div>
               </div>
               <div className="rounded-lg border border-line bg-white/70 p-3">
                 <div className="label">邮件推送</div>
