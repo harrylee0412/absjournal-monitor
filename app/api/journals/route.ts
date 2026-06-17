@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth/server';
 
 const prisma = new PrismaClient();
@@ -15,11 +15,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const ranking = searchParams.get('ranking');
-    const domain = searchParams.get('domain');
+    const domain = searchParams.get('domain') || searchParams.get('field');
+    const scope = searchParams.get('scope');
     const isFt50 = searchParams.get('isFt50') === 'true';
     const isUtd24 = searchParams.get('isUtd24') === 'true';
     const isFollowed = searchParams.get('isFollowed') === 'true';
     const getDomains = searchParams.get('getDomains') === 'true';
+    const limit = Math.min(Number.parseInt(searchParams.get('limit') || '100', 10) || 100, 500);
 
     // Return distinct domains for dropdown
     if (getDomains) {
@@ -33,7 +35,7 @@ export async function GET(request: Request) {
     }
 
     // Build query conditions
-    const where: any = {};
+    const where: Prisma.JournalWhereInput = {};
 
     if (search) {
         where.title = { contains: search, mode: 'insensitive' };
@@ -50,6 +52,21 @@ export async function GET(request: Request) {
     if (isUtd24) {
         where.isUtd24 = true;
     }
+    if (scope === 'ft50') {
+        where.isFt50 = true;
+    }
+    if (scope === 'utd24') {
+        where.isUtd24 = true;
+    }
+    if (scope === 'abs4star') {
+        where.ajgRanking = '4*';
+    }
+    if (scope === 'abs4') {
+        where.ajgRanking = { in: ['4', '4*'] };
+    }
+    if (scope === 'abs3plus') {
+        where.ajgRanking = { in: ['3', '4', '4*'] };
+    }
     if (isFollowed) {
         where.followers = {
             some: { userId }
@@ -59,7 +76,7 @@ export async function GET(request: Request) {
     try {
         const journals = await prisma.journal.findMany({
             where,
-            take: 100,
+            take: limit,
             orderBy: { title: 'asc' },
             include: {
                 followers: {

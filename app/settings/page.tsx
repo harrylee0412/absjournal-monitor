@@ -2,7 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Clock, Copy, Check, RefreshCw, Wifi, BookOpen } from 'lucide-react';
+import { Save, Clock, Copy, Check, RefreshCw, Wifi, BookOpen, KeyRound } from 'lucide-react';
+
+type SmtpConfig = {
+    host?: string;
+    port?: string | number;
+    auth?: {
+        user?: string;
+        pass?: string;
+    };
+    from?: string;
+};
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -30,6 +40,14 @@ export default function SettingsPage() {
     const [zoteroSyncing, setZoteroSyncing] = useState(false);
     const [zoteroSyncResult, setZoteroSyncResult] = useState<string | null>(null);
 
+    // LLM translation fields
+    const [llmEndpoint, setLlmEndpoint] = useState('');
+    const [llmModel, setLlmModel] = useState('');
+    const [llmApiKey, setLlmApiKey] = useState('');
+    const [llmHasApiKey, setLlmHasApiKey] = useState(false);
+    const [llmSaving, setLlmSaving] = useState(false);
+    const [llmMessage, setLlmMessage] = useState('');
+
     const copyToClipboard = (text: string, field: string) => {
         navigator.clipboard.writeText(text);
         setCopied(field);
@@ -38,6 +56,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         fetchSettings();
+        fetchLlmConfig();
     }, []);
 
     const fetchSettings = async () => {
@@ -54,9 +73,9 @@ export default function SettingsPage() {
                 setPreferredHour(data.preferredHour ?? 0);
                 if (data.smtpConfig) {
                     try {
-                        const config: any = JSON.parse(data.smtpConfig);
+                        const config: SmtpConfig = JSON.parse(data.smtpConfig);
                         setSmtpHost(config.host || '');
-                        setSmtpPort(config.port || '587');
+                        setSmtpPort(String(config.port || '587'));
                         setSmtpUser(config.auth?.user || '');
                         setSmtpPass(config.auth?.pass || '');
                         setFromEmail(config.from || '');
@@ -69,6 +88,43 @@ export default function SettingsPage() {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLlmConfig = async () => {
+        try {
+            const res = await axios.get('/api/user/llm-config');
+            const data = res.data.data;
+            if (data) {
+                setLlmEndpoint(data.endpoint || '');
+                setLlmModel(data.model || '');
+                setLlmHasApiKey(Boolean(data.hasApiKey));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const saveLlmConfig = async () => {
+        setLlmSaving(true);
+        setLlmMessage('');
+        try {
+            await axios.patch('/api/user/llm-config', {
+                endpoint: llmEndpoint,
+                model: llmModel,
+                apiKey: llmApiKey || undefined
+            });
+            setLlmHasApiKey(true);
+            setLlmApiKey('');
+            setLlmMessage('LLM config saved.');
+        } catch (e) {
+            if (axios.isAxiosError(e)) {
+                setLlmMessage(e.response?.data?.error || 'Failed to save LLM config');
+            } else {
+                setLlmMessage('Failed to save LLM config');
+            }
+        } finally {
+            setLlmSaving(false);
         }
     };
 
@@ -124,7 +180,7 @@ export default function SettingsPage() {
                         Daily Update Schedule
                     </h3>
                     <p className="text-sm text-gray-500 mb-4">
-                        Choose when you'd like to receive daily article updates. Our server will check for new articles at this time every day.
+                        Choose when you&apos;d like to receive daily article updates. Our server will check for new articles at this time every day.
                     </p>
                     <select
                         value={preferredHour}
@@ -273,8 +329,64 @@ export default function SettingsPage() {
                 </div>
             </div>
 
+            <div className="panel p-6 space-y-4">
+                <div>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-1 flex items-center gap-2">
+                        <KeyRound className="w-5 h-5" />
+                        LLM Translation
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                        用于话题周报的中文翻译。API Key 会加密保存；留空 API Key 可只更新 endpoint/model。
+                    </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">OpenAI-compatible Endpoint</label>
+                        <input
+                            type="text"
+                            value={llmEndpoint}
+                            onChange={e => setLlmEndpoint(e.target.value)}
+                            className="input mt-1"
+                            placeholder="https://api.openai.com/v1"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Model</label>
+                        <input
+                            type="text"
+                            value={llmModel}
+                            onChange={e => setLlmModel(e.target.value)}
+                            className="input mt-1"
+                            placeholder="gpt-4o-mini"
+                        />
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                            API Key {llmHasApiKey ? '(saved)' : ''}
+                        </label>
+                        <input
+                            type="password"
+                            value={llmApiKey}
+                            onChange={e => setLlmApiKey(e.target.value)}
+                            className="input mt-1"
+                            placeholder={llmHasApiKey ? 'Leave blank to keep existing key' : 'sk-...'}
+                        />
+                    </div>
+                </div>
+                {llmMessage && <p className="text-sm font-semibold text-oxford">{llmMessage}</p>}
+                <div className="flex justify-end">
+                    <button
+                        onClick={saveLlmConfig}
+                        disabled={llmSaving || !llmEndpoint || !llmModel || (!llmHasApiKey && !llmApiKey)}
+                        className="btn"
+                    >
+                        {llmSaving ? 'Saving...' : 'Save LLM Config'}
+                    </button>
+                </div>
+            </div>
+
             {/* Zotero Sync Section */}
-            <div className="bg-white shadow sm:rounded-lg p-6 space-y-4">
+            <div className="panel p-6 space-y-4">
                 <div>
                     <h3 className="text-lg font-medium leading-6 text-gray-900 mb-1 flex items-center gap-2">
                         <BookOpen className="w-5 h-5" />
@@ -326,8 +438,11 @@ export default function SettingsPage() {
                                 });
                                 const res = await axios.post('/api/zotero/test');
                                 setZoteroTestResult(res.data);
-                            } catch (e: any) {
-                                setZoteroTestResult({ ok: false, message: e.response?.data?.message || '测试失败' });
+                            } catch (e) {
+                                setZoteroTestResult({
+                                    ok: false,
+                                    message: axios.isAxiosError(e) ? e.response?.data?.message || '测试失败' : '测试失败'
+                                });
                             } finally {
                                 setZoteroTesting(false);
                             }
@@ -359,8 +474,8 @@ export default function SettingsPage() {
                                 setZoteroSyncResult(
                                     `同步完成！创建了 ${d.collectionsCreated} 个分类，${d.itemsCreated} 篇文章条目（共 ${d.totalJournals} 本期刊，${d.totalArticles} 篇文章）。`
                                 );
-                            } catch (e: any) {
-                                setZoteroSyncResult(e.response?.data?.error || '同步失败');
+                            } catch (e) {
+                                setZoteroSyncResult(axios.isAxiosError(e) ? e.response?.data?.error || '同步失败' : '同步失败');
                             } finally {
                                 setZoteroSyncing(false);
                             }

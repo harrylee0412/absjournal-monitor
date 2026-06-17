@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { verifyApiKey, isAuthError } from '@/lib/auth/apikey';
 
 const prisma = new PrismaClient();
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     }
 
     // Build where clause
-    const where: any = {
+    const where: Prisma.ArticleWhereInput = {
       journalId: { in: journalIds },
     };
 

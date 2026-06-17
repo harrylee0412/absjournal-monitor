@@ -1,8 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { Article, Journal, PrismaClient, UserSettings } from '@prisma/client';
 import { fetchNewArticlesForJournal } from '@/lib/crossref';
 import { format } from 'date-fns';
+import { recordTopicMatchesForArticle } from '@/lib/topics';
 
 const prisma = new PrismaClient();
+type ArticleWithJournal = Article & { journal: Journal };
 
 // Maximum journals to process per cron invocation (Safe limit: 2 to prevent 10s timeout)
 const BATCH_SIZE = 2;
@@ -27,7 +29,7 @@ export async function updateArticlesForUser(userId: string, options?: { batchSiz
 
     // Get batch to process
     const batch = followedJournals.slice(startIndex, startIndex + limit);
-    const newArticles: any[] = [];
+    const newArticles: ArticleWithJournal[] = [];
 
     for (const follow of batch) {
         const journal = follow.journal;
@@ -40,7 +42,7 @@ export async function updateArticlesForUser(userId: string, options?: { batchSiz
                 try {
                     const doi = work.DOI;
                     const title = work.title?.[0] || 'No Title';
-                    const authors = work.author?.map((a: any) => `${a.given || ''} ${a.family || ''}`).join(', ') || '';
+                    const authors = work.author?.map((a: { given?: string; family?: string }) => `${a.given || ''} ${a.family || ''}`).join(', ') || '';
                     const abstract = work.abstract || '';
                     const pubDate = new Date(work.created['date-time']);
                     const url = work.URL;
@@ -65,6 +67,8 @@ export async function updateArticlesForUser(userId: string, options?: { batchSiz
                         });
                         newArticles.push({ ...article, journal });
                     }
+
+                    await recordTopicMatchesForArticle(prisma, userId, article);
                 } catch (e) {
                     console.error(`Failed to save article ${work.DOI}`, e);
                 }
@@ -100,7 +104,7 @@ export async function updateArticlesForUser(userId: string, options?: { batchSiz
 }
 
 // Send email to a specific user
-export async function sendNewArticlesEmailForUser(newArticles: any[], settings: any) {
+export async function sendNewArticlesEmailForUser(newArticles: ArticleWithJournal[], settings: UserSettings) {
     if (!settings.smtpConfig || !settings.targetEmail) return;
 
     const nodemailer = await import('nodemailer');

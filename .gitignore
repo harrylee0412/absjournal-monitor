@@ -35,6 +35,8 @@ prisma/migrations/
 prisma/migrations/*
 !prisma/migrations/20260316090000_add_article_search_indexes/
 !prisma/migrations/20260316090000_add_article_search_indexes/migration.sql
+!prisma/migrations/20260617152000_topic_subscriptions/
+!prisma/migrations/20260617152000_topic_subscriptions/migration.sql
 
 # Vercel
 .vercel

@@ -37,6 +37,8 @@ model Article {
   
   journal         Journal       @relation(fields: [journalId], references: [id])
   userArticles    UserArticle[]
+  topicMatches    TopicArticleMatch[]
+  summaryArticles TopicSummaryRunArticle[]
 }
 
 // User journal follows (per-user)
@@ -85,3 +87,91 @@ model UserSettings {
   @@index([preferredHour])
 }
 
+// Topic subscriptions run on top of the user's followed journals.
+model TopicSubscription {
+  id              Int       @id @default(autoincrement())
+  userId          String
+  name            String
+  keywords        String[]
+  enabled         Boolean   @default(true)
+  translateMode   String    @default("llm") // llm | baidu | none
+  deliveryEnabled Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  matches         TopicArticleMatch[]
+  summaryRuns     TopicSummaryRun[]
+
+  @@index([userId])
+  @@index([userId, enabled])
+}
+
+model TopicArticleMatch {
+  id              Int       @id @default(autoincrement())
+  userId          String
+  topicId         Int
+  articleId       Int
+  matchedKeywords String[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  topic           TopicSubscription @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  article         Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, articleId])
+  @@index([userId])
+  @@index([topicId])
+  @@index([articleId])
+  @@index([createdAt])
+}
+
+model TopicSummaryRun {
+  id              Int       @id @default(autoincrement())
+  userId          String
+  topicId         Int
+  windowStart     DateTime
+  windowEnd       DateTime
+  status          String    @default("PENDING")
+  summaryMarkdown String?
+  paperCount      Int       @default(0)
+  deliveryStatus  String?
+  deliveryError   String?
+  createdAt       DateTime  @default(now())
+
+  topic           TopicSubscription @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  articles        TopicSummaryRunArticle[]
+
+  @@index([userId])
+  @@index([topicId])
+  @@index([createdAt])
+}
+
+model TopicSummaryRunArticle {
+  id                 Int       @id @default(autoincrement())
+  runId              Int
+  articleId          Int
+  matchedKeywords    String[]
+  translatedTitle    String?
+  translatedAbstract String?
+  createdAt          DateTime  @default(now())
+
+  run                TopicSummaryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  article            Article         @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, articleId])
+  @@index([runId])
+  @@index([articleId])
+}
+
+model UserLlmConfig {
+  id              Int       @id @default(autoincrement())
+  userId          String    @unique
+  provider        String    @default("openai-compatible")
+  endpoint        String
+  model           String
+  encryptedApiKey String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+}

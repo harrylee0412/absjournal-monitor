@@ -23,6 +23,7 @@ export default function JournalsPage() {
     const [search, setSearch] = useState('');
     const [ajgFilter, setAjgFilter] = useState('');
     const [domainFilter, setDomainFilter] = useState('');
+    const [scopeFilter, setScopeFilter] = useState('');
     const [domains, setDomains] = useState<string[]>([]);
     const [isFt50, setIsFt50] = useState(false);
     const [isUtd24, setIsUtd24] = useState(false);
@@ -46,7 +47,7 @@ export default function JournalsPage() {
             fetchJournals();
         }, 500);
         return () => clearTimeout(timer);
-    }, [search, ajgFilter, domainFilter, isFt50, isUtd24, onlyFollowed]);
+    }, [search, ajgFilter, domainFilter, scopeFilter, isFt50, isUtd24, onlyFollowed]);
 
     const fetchDomains = async () => {
         try {
@@ -60,10 +61,11 @@ export default function JournalsPage() {
     const fetchJournals = async () => {
         setLoading(true);
         try {
-            const params: any = {};
+            const params: Record<string, string> = {};
             if (search) params.search = search;
             if (ajgFilter) params.ranking = ajgFilter;
             if (domainFilter) params.domain = domainFilter;
+            if (scopeFilter) params.scope = scopeFilter;
             if (isFt50) params.isFt50 = 'true';
             if (isUtd24) params.isUtd24 = 'true';
             if (onlyFollowed) params.isFollowed = 'true';
@@ -121,19 +123,20 @@ export default function JournalsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col gap-3 border-b border-line pb-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Journals</h1>
-                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Journal Selection</p>
+                    <h1 className="font-serif text-4xl font-semibold text-ink">期刊关注</h1>
+                    <p className="text-sm text-sage mt-1 flex items-center gap-1">
                         <Info className="w-4 h-4" />
-                        You can follow up to 30 journals.
+                        You can follow up to 30 journals. Topics use this same journal set.
                     </p>
                 </div>
 
                 {/* Add Custom Journal Button */}
                 <button
                     onClick={() => setShowAddCustom(!showAddCustom)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    className="btn"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Custom Journal
@@ -144,7 +147,7 @@ export default function JournalsPage() {
             {showAddCustom && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-green-800 mb-2">Add Journal by ISSN</h3>
-                    <p className="text-xs text-green-600 mb-3">Enter an ISSN to add a journal not in the ABS list. We'll validate it with CrossRef.</p>
+                    <p className="text-xs text-green-600 mb-3">Enter an ISSN to add a journal not in the ABS list. We&apos;ll validate it with CrossRef.</p>
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -202,6 +205,19 @@ export default function JournalsPage() {
                     />
                     <span>Only Followed</span>
                 </label>
+
+                <select
+                    value={scopeFilter}
+                    onChange={e => setScopeFilter(e.target.value)}
+                    className="input max-w-[180px] py-1.5 text-sm"
+                >
+                    <option value="">All Scopes</option>
+                    <option value="utd24">UTD24</option>
+                    <option value="ft50">FT50</option>
+                    <option value="abs3plus">ABS 3+</option>
+                    <option value="abs4">ABS 4/4*</option>
+                    <option value="abs4star">ABS 4*</option>
+                </select>
 
                 <select
                     value={ajgFilter}

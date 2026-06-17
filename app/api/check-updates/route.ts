@@ -3,6 +3,7 @@ import { Article, Journal, PrismaClient, UserSettings } from '@prisma/client';
 import { fetchNewArticlesForJournal } from '@/lib/crossref';
 import { sendNewArticlesEmailForUser } from '@/lib/monitor';
 import { after } from 'next/server';
+import { recordTopicMatchesForArticle } from '@/lib/topics';
 
 const prisma = new PrismaClient();
 
@@ -256,6 +257,8 @@ export async function POST(request: Request) {
                                         batchNewArticles.push({ ...article, journal });
                                         newCount++;
                                     }
+
+                                    await recordTopicMatchesForArticle(prisma, userId, article);
                                 } catch (articleError) {
                                     console.error(`Failed to save article ${work.DOI}`, articleError);
                                 } finally {

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { authClient } from "@/lib/auth/client";
-import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth/react";
-import Navbar from "@/components/Navbar";
+import { NeonAuthUIProvider } from "@neondatabase/auth/react";
+import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,12 +35,7 @@ export default function RootLayout({
           redirectTo="/"
           emailOTP
         >
-          <div className="min-h-screen bg-background">
-            <Navbar />
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              {children}
-            </main>
-          </div>
+          <AppShell>{children}</AppShell>
         </NeonAuthUIProvider>
       </body>
     </html>

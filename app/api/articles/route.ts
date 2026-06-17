@@ -63,6 +63,9 @@ export async function GET(request: Request) {
     const q = (searchParams.get('q') || '').trim();
     const searchMode = normalizeSearchMode(searchParams.get('searchMode'));
     const sort = normalizeSortMode(searchParams.get('sort'));
+    const topicIdRaw = searchParams.get('topicId');
+    const topicId = topicIdRaw ? Number.parseInt(topicIdRaw, 10) : null;
+    const matchedOnly = searchParams.get('matchedOnly') === 'true';
 
     try {
         // 获取用户关注的期刊
@@ -78,10 +81,26 @@ export async function GET(request: Request) {
             return NextResponse.json({ data: [], total: 0, hasMore: false, limit, offset });
         }
 
+        let matchedArticleIds: number[] | null = null;
+        if ((topicIdRaw && Number.isFinite(topicId)) || matchedOnly) {
+            const matches = await prisma.topicArticleMatch.findMany({
+                where: {
+                    userId,
+                    ...(topicId && Number.isFinite(topicId) ? { topicId } : {})
+                },
+                select: { articleId: true }
+            });
+            matchedArticleIds = Array.from(new Set(matches.map(match => match.articleId)));
+            if (matchedArticleIds.length === 0) {
+                return NextResponse.json({ data: [], total: 0, hasMore: false, limit, offset });
+            }
+        }
+
         // Non-search path keeps the previous behaviour and shape.
         if (!q) {
             const where: Prisma.ArticleWhereInput = {
                 journalId: { in: journalIds },
+                ...(matchedArticleIds ? { id: { in: matchedArticleIds } } : {}),
                 ...(unreadOnly ? {
                     NOT: {
                         userArticles: {
@@ -95,10 +114,18 @@ export async function GET(request: Request) {
                 prisma.article.findMany({
                     where,
                     include: {
-                        journal: { select: { title: true } },
+                        journal: { select: { title: true, ajgRanking: true, isFt50: true, isUtd24: true } },
                         userArticles: {
                             where: { userId },
                             select: { isRead: true }
+                        },
+                        topicMatches: {
+                            where: { userId },
+                            include: {
+                                topic: {
+                                    select: { id: true, name: true }
+                                }
+                            }
                         }
                     },
                     orderBy: [
@@ -127,6 +154,9 @@ export async function GET(request: Request) {
         }
 
         const visibilityFilter = Prisma.sql`a."journalId" IN (${Prisma.join(journalIds)})`;
+        const matchedFilter = matchedArticleIds
+            ? Prisma.sql`AND a."id" IN (${Prisma.join(matchedArticleIds)})`
+            : Prisma.empty;
         const unreadFilter = unreadOnly
             ? Prisma.sql`AND COALESCE(ua."isRead", false) = false`
             : Prisma.empty;
@@ -179,6 +209,7 @@ export async function GET(request: Request) {
                     ON ua."articleId" = a."id"
                     AND ua."userId" = ${userId}
                 WHERE ${visibilityFilter}
+                ${matchedFilter}
                 ${unreadFilter}
             ),
             scored AS (
@@ -222,6 +253,7 @@ export async function GET(request: Request) {
                     ON ua."articleId" = a."id"
                     AND ua."userId" = ${userId}
                 WHERE ${visibilityFilter}
+                ${matchedFilter}
                 ${unreadFilter}
             ),
             scored AS (
@@ -237,6 +269,26 @@ export async function GET(request: Request) {
 
         const total = toNumber(totalRows[0]?.total);
 
+        const topicMatches = rows.length > 0
+            ? await prisma.topicArticleMatch.findMany({
+                where: {
+                    userId,
+                    articleId: { in: rows.map(row => row.id) }
+                },
+                include: {
+                    topic: {
+                        select: { id: true, name: true }
+                    }
+                }
+            })
+            : [];
+        const matchesByArticle = new Map<number, typeof topicMatches>();
+        for (const match of topicMatches) {
+            const list = matchesByArticle.get(match.articleId) || [];
+            list.push(match);
+            matchesByArticle.set(match.articleId, list);
+        }
+
         const result = rows.map(row => ({
             id: row.id,
             doi: row.doi,
@@ -249,7 +301,8 @@ export async function GET(request: Request) {
             createdAt: row.createdAt,
             isRead: row.isRead,
             score: Number(row.score || 0),
-            journal: { title: row.journalTitle }
+            journal: { title: row.journalTitle },
+            topicMatches: matchesByArticle.get(row.id) || []
         }));
 
         return NextResponse.json({

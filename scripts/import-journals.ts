@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import * as path from 'path';
 
 const prisma = new PrismaClient();
+type AjgRow = Record<string, string | number | boolean | null | undefined>;
 
 async function main() {
   // The project is at .../抓取文献/journal-monitor
@@ -12,7 +13,7 @@ async function main() {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const data: any[] = XLSX.utils.sheet_to_json(sheet);
+  const data = XLSX.utils.sheet_to_json<AjgRow>(sheet);
 
   console.log(`Found ${data.length} rows in Excel.`);
 
@@ -20,7 +21,7 @@ async function main() {
   for (const row of data) {
     try {
       // Columns: id, print_issn, e_issn, field, title, ajg_2024, is_ft50, is_utd24
-      const title = row['title'];
+      const title = row['title'] ? String(row['title']).trim() : '';
       if (!title) continue;
 
       const printIssn = row['print_issn'] ? String(row['print_issn']).trim() : null;
@@ -34,7 +35,7 @@ async function main() {
       await prisma.journal.upsert({
         where: {
           // Use a combination of ISSNs for matching existing journals
-          id: row['id'] || 0
+          id: typeof row['id'] === 'number' ? row['id'] : Number(row['id'] || 0)
         },
         update: {
           domain,  // Update domain for existing journals
@@ -55,7 +56,7 @@ async function main() {
     } catch (e) {
       // If upsert fails (e.g., no matching id), try create
       try {
-        const title = row['title'];
+        const title = row['title'] ? String(row['title']).trim() : '';
         const printIssn = row['print_issn'] ? String(row['print_issn']).trim() : null;
         const eIssn = row['e_issn'] ? String(row['e_issn']).trim() : null;
         const ajgRanking = row['ajg_2024'] ? String(row['ajg_2024']) : null;
