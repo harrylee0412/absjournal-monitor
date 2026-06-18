@@ -16,7 +16,7 @@ export function findMatchedKeywords(article: Pick<Article, 'title' | 'authors' |
     const haystack = normalizeSearchText([article.title, article.authors, article.abstract].filter(Boolean).join('\n'));
     return keywords.filter(keyword => {
         const normalizedKeyword = normalizeSearchText(keyword);
-        return normalizedKeyword.length > 0 && haystack.includes(normalizedKeyword);
+        return keywordMatches(haystack, normalizedKeyword);
     });
 }
 
@@ -120,4 +120,22 @@ function normalizeSearchText(value: string) {
         .normalize('NFKC')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function keywordMatches(haystack: string, normalizedKeyword: string) {
+    if (!normalizedKeyword) return false;
+
+    if (/^[a-z0-9][a-z0-9\s-]*[a-z0-9]$|^[a-z0-9]$/i.test(normalizedKeyword)) {
+        const pattern = normalizedKeyword
+            .split(/\s+/)
+            .map(escapeRegExp)
+            .join('\\s+');
+        return new RegExp(`(^|[^a-z0-9])${pattern}($|[^a-z0-9])`, 'i').test(haystack);
+    }
+
+    return haystack.includes(normalizedKeyword);
+}
+
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
