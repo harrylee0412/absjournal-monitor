@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth/server';
 import { normalizeTranslateMode } from '@/lib/translator';
-import { backfillTopicMatchesForUser, splitKeywords } from '@/lib/topics';
+import { splitKeywords } from '@/lib/topics';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +49,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'At least one keyword is required' }, { status: 400 });
     }
 
+    const existing = await prisma.topicSubscription.findFirst({
+        where: {
+            userId: session.user.id,
+            name: { equals: name, mode: 'insensitive' }
+        }
+    });
+    if (existing) {
+        return NextResponse.json({ data: existing, reused: true });
+    }
+
     const topic = await prisma.topicSubscription.create({
         data: {
             userId: session.user.id,
@@ -59,7 +69,6 @@ export async function POST(request: Request) {
             deliveryEnabled: body.deliveryEnabled !== false
         }
     });
-    await backfillTopicMatchesForUser(prisma, session.user.id, topic.id);
 
     return NextResponse.json({ data: topic }, { status: 201 });
 }

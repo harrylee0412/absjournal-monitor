@@ -29,6 +29,7 @@ export default function NewTopicPage() {
     }, []);
 
     async function submit() {
+        if (saving) return;
         setSaving(true);
         setMessage('');
         try {
@@ -37,11 +38,18 @@ export default function NewTopicPage() {
                 keywords,
                 translateMode,
                 deliveryEnabled
+            }, {
+                timeout: 15000
             });
+            setMessage(res.data.reused ? '已存在同名话题，正在打开...' : '保存成功，正在打开...');
             window.location.href = `/topics/${res.data.data.id}`;
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                setMessage(error.response?.data?.error || '保存失败');
+                if (error.code === 'ECONNABORTED') {
+                    setMessage('保存超时，请刷新话题列表确认是否已经创建。');
+                } else {
+                    setMessage(error.response?.data?.error || '保存失败');
+                }
             } else {
                 setMessage('保存失败');
             }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth/server';
 import { normalizeTranslateMode } from '@/lib/translator';
-import { backfillTopicMatchesForUser, splitKeywords } from '@/lib/topics';
+import { splitKeywords } from '@/lib/topics';
 
 const prisma = new PrismaClient();
 
@@ -89,7 +89,6 @@ export async function PATCH(
             deliveryEnabled: body.deliveryEnabled === undefined ? existing.deliveryEnabled : Boolean(body.deliveryEnabled)
         }
     });
-    await backfillTopicMatchesForUser(prisma, session.user.id, topic.id);
 
     return NextResponse.json({ data: topic });
 }
