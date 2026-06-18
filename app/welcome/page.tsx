@@ -1,207 +1,340 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { BookOpen, Bell, Download, Search, CheckCircle, ArrowRight, Zap, Globe, Database } from 'lucide-react';
+import {
+    ArrowRight,
+    Bell,
+    BookOpen,
+    CalendarClock,
+    Database,
+    Download,
+    FileText,
+    KeyRound,
+    Languages,
+    List,
+    Mail,
+    Rss,
+    Search,
+    Settings,
+} from 'lucide-react';
+
+const modules = [
+    {
+        icon: BookOpen,
+        title: '每日论文',
+        description: '每天从 CrossRef 抓取你关注期刊的新文章，支持搜索、未读筛选、RIS 导出。',
+    },
+    {
+        icon: Rss,
+        title: '话题订阅',
+        description: '在已关注的 30 本以内期刊中，用关键词追踪具体研究主题和命中文章。',
+    },
+    {
+        icon: FileText,
+        title: '每周周报',
+        description: '默认每周一 08:00 UTC（北京时间 16:00）生成话题摘要，并记录发送状态。',
+    },
+    {
+        icon: List,
+        title: '关注期刊',
+        description: '用 ABS、FT50、UTD24 等标签筛选期刊，第一版保持最多关注 30 本。',
+    },
+    {
+        icon: Settings,
+        title: '账户设置',
+        description: '配置邮箱 SMTP、Zotero、LLM API；用户密钥在服务端加密保存。',
+    },
+    {
+        icon: Download,
+        title: '文献流转',
+        description: '从论文列表导出 RIS，或连接 Zotero，把监控结果接入现有阅读流程。',
+    },
+];
+
+const workflow = [
+    {
+        step: '01',
+        title: '选择关注期刊',
+        body: '从 ABS / FT50 / UTD24 列表里筛选，关注最多 30 本真正需要每日监控的期刊。',
+    },
+    {
+        step: '02',
+        title: '每日抓取新论文',
+        body: '系统按你的关注范围从 CrossRef 获取新文章，保留标题、作者、DOI、期刊标签。',
+    },
+    {
+        step: '03',
+        title: '匹配话题关键词',
+        body: '话题订阅只在已关注期刊内生效，避免扩大抓取范围，也降低误报和成本。',
+    },
+    {
+        step: '04',
+        title: '周一生成摘要',
+        body: '每周一汇总过去 7 天命中文章，可用用户 LLM 或百度翻译生成中文摘要。',
+    },
+];
 
 export default function WelcomePage() {
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900">
-            {/* Navbar */}
-            <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-xl sticky top-0 z-50">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-blue-700">
-                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-200">
-                            <BookOpen className="w-5 h-5 text-white" />
+        <div className="min-h-screen bg-paper text-ink">
+            <header className="sticky top-0 z-30 border-b border-line bg-paper/95 backdrop-blur">
+                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
+                    <Link href="/welcome" className="min-w-0">
+                        <div className="font-serif text-2xl font-semibold">Journal Monitor</div>
+                        <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-sage">
+                            每日论文 · 每周话题
                         </div>
-                        <span>JournalMonitor</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <Link href="/auth/sign-in" className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">
-                            登录
-                        </Link>
-                        <Link href="/auth/sign-up">
-                            <button className="h-9 px-5 py-2 bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center justify-center rounded-full text-sm font-medium transition-all shadow-sm hover:shadow-md">
-                                免费注册
-                            </button>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Hero Section */}
-            <section className="pt-24 pb-32 overflow-hidden relative">
-                {/* Background Decorative Elements */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-                    <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
-                    <div className="absolute top-[10%] left-[-10%] w-[500px] h-[500px] bg-purple-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
-                </div>
-
-                <div className="container mx-auto px-4 text-center relative z-10">
-                    <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 mb-8 shadow-sm">
-                        <span className="flex h-2 w-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
-                        自动同步 CrossRef 最新数据
-                    </div>
-
-                    <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 text-slate-900 leading-[1.15]">
-                        科研路上的<br />
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">最佳文献助手</span>
-                    </h1>
-
-                    <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-                        专为研究人员打造。一站式追踪 ABS、FT50、UTD24 顶级期刊，
-                        第一时间获取最新发表动态，让文献调研不再繁琐。
-                    </p>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link href="/auth/sign-up">
-                            <button className="h-14 px-8 text-lg bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 inline-flex items-center justify-center rounded-full font-semibold transition-all hover:scale-105">
-                                立即开始使用 <ArrowRight className="ml-2 w-5 h-5" />
-                            </button>
-                        </Link>
-                        <Link href="#features">
-                            <button className="h-14 px-8 text-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm inline-flex items-center justify-center rounded-full font-medium transition-all">
-                                了解更多
-                            </button>
-                        </Link>
-                    </div>
-
-                    {/* Feature Highlight Pill */}
-                    <div className="mt-16 inline-flex items-center gap-8 py-4 px-8 bg-white/60 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                            <span className="font-semibold text-slate-700">1,800+ 期刊</span>
-                        </div>
-                        <div className="w-px h-6 bg-slate-300"></div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                            <span className="font-semibold text-slate-700">每日更新</span>
-                        </div>
-                        <div className="w-px h-6 bg-slate-300"></div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                            <span className="font-semibold text-slate-700">Zotero 支持</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Features Grid */}
-            <section id="features" className="py-24 bg-white">
-                <div className="container mx-auto px-4">
-                    <div className="text-center mb-16 max-w-2xl mx-auto">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-4">为什么选择 JournalMonitor？</h2>
-                        <p className="text-lg text-slate-600">我们解决了文献抓取的痛点，让您专注于阅读与思考。</p>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                        <FeatureCard
-                            icon={<Search className="w-6 h-6 text-blue-600" />}
-                            title="权威期刊索引"
-                            description="内置 ABS 2024、FT50、UTD24 等权威列表。无需手动收集期刊主页，一键关注整个领域的顶级刊物。"
-                        />
-                        <FeatureCard
-                            icon={<Bell className="w-6 h-6 text-indigo-600" />}
-                            title="每日智能推送"
-                            description="基于 Serverless 的云端定时任务，每日自动拉取最新发表文章，并通过邮件摘要准时发送给您。"
-                        />
-                        <FeatureCard
-                            icon={<Download className="w-6 h-6 text-emerald-600" />}
-                            title="无缝导出引用"
-                            description="支持导出标准 RIS 格式文件，完美兼容 Zotero、EndNote 等文献管理软件，引文管理一步到位。"
-                        />
-                    </div>
-                </div>
-            </section>
-
-            {/* Architecture/How it works */}
-            <section className="py-24 bg-slate-50 border-t border-slate-200">
-                <div className="container mx-auto px-4">
-                    <div className="flex flex-col md:flex-row items-center gap-16 max-w-6xl mx-auto">
-                        <div className="flex-1">
-                            <h2 className="text-3xl font-bold text-slate-900 mb-6">不只是简单的网页</h2>
-                            <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                                JournalMonitor 运行在高性能云端架构上，为您提供稳定可靠的服务。
-                            </p>
-                            <div className="space-y-6">
-                                <TechItem
-                                    icon={<Zap className="w-5 h-5 text-amber-500" />}
-                                    title="云端 Serverless 运行"
-                                    desc="即使您关闭电脑，云端服务也会按时为您自动抓取数据。"
-                                />
-                                <TechItem
-                                    icon={<Database className="w-5 h-5 text-blue-500" />}
-                                    title="Neon PostgreSQL 数据库"
-                                    desc="企业级云数据库，确保存储数万条文献数据依然流畅快速。"
-                                />
-                                <TechItem
-                                    icon={<Globe className="w-5 h-5 text-purple-500" />}
-                                    title="Crossref 官方源"
-                                    desc="直接对接出版商官方数据源，确保信息准确无误、更新及时。"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1 bg-white p-8 rounded-2xl shadow-xl border border-slate-100 relative">
-                            {/* Abstract Visual Representation of the Sync Process */}
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                    <span className="font-semibold text-slate-700">16:00 PM</span>
-                                    <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded">System Trigger</span>
-                                </div>
-                                <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
-                                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-100">
-                                    <span className="font-semibold text-blue-700">Sync with Crossref</span>
-                                    <span className="text-xs text-blue-600">Scanning 1,800+ Journals...</span>
-                                </div>
-                                <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
-                                <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                                    <span className="font-semibold text-indigo-700">Email Notification</span>
-                                    <span className="text-xs text-indigo-600">Sent to your inbox</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* CTA Bottom */}
-            <section className="py-24 relative overflow-hidden bg-blue-600">
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20"></div>
-                <div className="container mx-auto px-4 text-center relative z-10">
-                    <h2 className="text-4xl font-bold text-white mb-6">准备好提升研究效率了吗？</h2>
-                    <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">完全免费开源。加入 JournalMonitor，把时间花在阅读而不是寻找上。</p>
-                    <Link href="/auth/sign-up">
-                        <button className="h-14 px-10 text-lg bg-white text-blue-600 hover:bg-blue-50 shadow-xl inline-flex items-center justify-center rounded-full font-bold transition-all hover:scale-105">
-                            立即免费注册
-                        </button>
                     </Link>
+                    <nav className="hidden items-center gap-5 text-sm font-semibold text-sage md:flex">
+                        <Link className="hover:text-oxford" href="#workflow">工作流</Link>
+                        <Link className="hover:text-oxford" href="#modules">功能模块</Link>
+                        <Link className="hover:text-oxford" href="#integrations">集成</Link>
+                    </nav>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <Link className="btn secondary" href="/auth/sign-in">登录</Link>
+                        <Link className="btn" href="/auth/sign-up">开始使用</Link>
+                    </div>
                 </div>
-            </section>
+            </header>
 
-            <footer className="py-8 bg-slate-50 border-t border-slate-200 text-center text-slate-500 text-sm">
-                <p>© 2026 Journal Monitor. Designed for Academics.</p>
+            <main>
+                <section className="mx-auto grid max-w-7xl gap-8 px-5 py-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:py-16">
+                    <div>
+                        <div className="mb-5 flex flex-wrap gap-2">
+                            <span className="tag">个人研究者版</span>
+                            <span className="tag">30 本期刊上限</span>
+                            <span className="tag">周一话题摘要</span>
+                        </div>
+                        <h1 className="font-serif text-5xl font-semibold leading-tight text-ink md:text-6xl">
+                            Journal Monitor
+                        </h1>
+                        <p className="mt-5 max-w-2xl text-lg leading-8 text-sage">
+                            一个面向个人研究者的期刊监控工作台：先关注核心期刊，每天查看新论文；
+                            再用话题订阅追踪具体研究问题，每周一收到结构化摘要。
+                        </p>
+                        <div className="mt-7 flex flex-wrap gap-3">
+                            <Link className="btn" href="/auth/sign-up">
+                                创建账号 <ArrowRight className="h-4 w-4" />
+                            </Link>
+                            <Link className="btn secondary" href="/auth/sign-in">已有账号登录</Link>
+                        </div>
+                        <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                            <Stat label="期刊范围" value="30 本内" />
+                            <Stat label="论文来源" value="CrossRef" />
+                            <Stat label="周报时间" value="周一 16:00" />
+                        </div>
+                    </div>
+
+                    <ProductPreview />
+                </section>
+
+                <section id="workflow" className="border-y border-line bg-card/70">
+                    <div className="mx-auto max-w-7xl px-5 py-12">
+                        <SectionHeader
+                            eyebrow="Workflow"
+                            title="先缩小期刊范围，再追踪具体话题"
+                            description="第一版不会为每个话题单独扩大抓取池。话题订阅只作用于你当前关注的期刊，主功能仍然是每日更新关注期刊的新文章。"
+                        />
+                        <div className="mt-8 grid gap-4 lg:grid-cols-4">
+                            {workflow.map(item => (
+                                <article className="panel p-5" key={item.step}>
+                                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-oxford">{item.step}</div>
+                                    <h3 className="mt-4 font-serif text-2xl font-semibold">{item.title}</h3>
+                                    <p className="mt-3 text-sm leading-6 text-sage">{item.body}</p>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                <section id="modules" className="mx-auto max-w-7xl px-5 py-12">
+                    <SectionHeader
+                        eyebrow="Modules"
+                        title="登录后的信息结构"
+                        description="页面不是简单列表，而是围绕研究监控拆成六个稳定模块：概览、论文、话题、期刊、周报、设置。"
+                    />
+                    <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {modules.map(item => {
+                            const Icon = item.icon;
+                            return (
+                                <article className="panel p-5" key={item.title}>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-white">
+                                            <Icon className="h-5 w-5 text-oxford" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-serif text-xl font-semibold">{item.title}</h3>
+                                            <p className="mt-2 text-sm leading-6 text-sage">{item.description}</p>
+                                        </div>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                <section id="integrations" className="border-y border-line bg-card/70">
+                    <div className="mx-auto grid max-w-7xl gap-6 px-5 py-12 lg:grid-cols-[0.92fr_1.08fr]">
+                        <div>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Integrations</p>
+                            <h2 className="font-serif text-4xl font-semibold">把摘要送到你的研究流程里</h2>
+                            <p className="mt-4 max-w-2xl leading-7 text-sage">
+                                系统保留轻量个人 SaaS 方向：不做团队空间和机构版，重点解决个人研究者的自动抓取、话题命中、摘要翻译和文献管理。
+                            </p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Integration icon={<Mail className="h-5 w-5" />} title="邮件推送" body="复用账户 SMTP 设置，把每日/每周结果发到你的目标邮箱。" />
+                            <Integration icon={<Languages className="h-5 w-5" />} title="摘要翻译" body="优先使用用户 LLM；失败后可降级到百度翻译；也可以选择不翻译。" />
+                            <Integration icon={<KeyRound className="h-5 w-5" />} title="密钥保护" body="LLM API key 使用 ENCRYPTION_SECRET 加密保存，不写入代码和日志。" />
+                            <Integration icon={<Database className="h-5 w-5" />} title="Neon 数据库" body="用户、期刊关注、话题命中、周报记录统一存储在 PostgreSQL。" />
+                        </div>
+                    </div>
+                </section>
+
+                <section className="mx-auto max-w-7xl px-5 py-12">
+                    <div className="panel grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-oxford">Start</p>
+                            <h2 className="mt-2 font-serif text-3xl font-semibold">从关注 20-30 本核心期刊开始</h2>
+                            <p className="mt-3 max-w-3xl leading-7 text-sage">
+                                先把每日论文流跑稳，再逐步增加话题订阅、LLM 摘要和 Zotero 流转。这样不会影响现有主功能，也便于后续接入 Vercel cron。
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Link className="btn secondary" href="/auth/sign-in">登录</Link>
+                            <Link className="btn" href="/auth/sign-up">创建账号</Link>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer className="border-t border-line px-5 py-8 text-center text-sm text-sage">
+                Journal Monitor · Designed for personal academic monitoring
             </footer>
         </div>
     );
 }
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function ProductPreview() {
     return (
-        <div className="p-8 rounded-2xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all group">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600">
-                {icon}
+        <div className="panel overflow-hidden">
+            <div className="border-b border-line bg-ink px-5 py-4 text-white">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <div className="font-serif text-xl font-semibold">研究概览</div>
+                        <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-white/55">Dashboard Preview</div>
+                    </div>
+                    <span className="rounded-lg border border-white/15 px-3 py-1 text-xs font-semibold text-white/70">周一 16:00 周报</span>
+                </div>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-            <p className="text-slate-600 leading-relaxed">{description}</p>
+            <div className="grid gap-5 p-5">
+                <div className="grid gap-3 sm:grid-cols-4">
+                    <PreviewMetric label="本周新增" value="18" />
+                    <PreviewMetric label="待处理" value="7" />
+                    <PreviewMetric label="话题命中" value="4" />
+                    <PreviewMetric label="关注期刊" value="20/30" />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-lg border border-line bg-white/70 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <h3 className="font-serif text-xl font-semibold">最近论文</h3>
+                            <Search className="h-4 w-4 text-sage" />
+                        </div>
+                        <PreviewPaper
+                            journal="Management Science"
+                            tags={['ABS 4*', 'FT50', 'AI']}
+                            title="Generative AI Models as Wicked Resources"
+                        />
+                        <PreviewPaper
+                            journal="Research Policy"
+                            tags={['ABS 4*', 'Topic Match']}
+                            title="AI in science: When and where it makes a difference"
+                        />
+                        <PreviewPaper
+                            journal="Strategic Management Journal"
+                            tags={['ABS 4*', 'UTD24']}
+                            title="Human-AI collaboration and organizational design"
+                        />
+                    </div>
+
+                    <div className="rounded-lg border border-line bg-white/70 p-4">
+                        <h3 className="font-serif text-xl font-semibold">话题订阅</h3>
+                        <div className="mt-4 grid gap-3 text-sm">
+                            <PreviewRow icon={<Rss className="h-4 w-4" />} label="AI" value="4 篇命中" />
+                            <PreviewRow icon={<Bell className="h-4 w-4" />} label="每周邮件" value="已开启" />
+                            <PreviewRow icon={<CalendarClock className="h-4 w-4" />} label="生成时间" value="周一 16:00" />
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
 
-function TechItem({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
     return (
-        <div className="flex gap-4 items-start">
-            <div className="mt-1 p-2 bg-slate-50 rounded-lg border border-slate-100 shadow-sm">{icon}</div>
-            <div>
-                <h4 className="font-bold text-slate-900">{title}</h4>
-                <p className="text-sm text-slate-500 mt-1">{desc}</p>
-            </div>
+        <div className="max-w-3xl">
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">{eyebrow}</p>
+            <h2 className="font-serif text-4xl font-semibold">{title}</h2>
+            <p className="mt-4 leading-7 text-sage">{description}</p>
         </div>
+    );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-line bg-white/70 px-4 py-3">
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-sage">{label}</div>
+            <div className="mt-1 font-serif text-2xl font-semibold text-ink">{value}</div>
+        </div>
+    );
+}
+
+function PreviewMetric({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-lg border border-line bg-paper px-3 py-3">
+            <div className="text-xs font-bold text-sage">{label}</div>
+            <div className="mt-1 font-serif text-2xl font-semibold">{value}</div>
+        </div>
+    );
+}
+
+function PreviewPaper({ journal, tags, title }: { journal: string; tags: string[]; title: string }) {
+    return (
+        <div className="border-t border-line py-3 first:border-t-0 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap gap-1">
+                <span className="tag">{journal}</span>
+                {tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}
+            </div>
+            <div className="mt-2 text-sm font-semibold text-ink">{title}</div>
+        </div>
+    );
+}
+
+function PreviewRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+    return (
+        <div className="flex items-center justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-2 font-semibold text-ink">
+                <span className="text-oxford">{icon}</span>
+                {label}
+            </div>
+            <span className="text-sage">{value}</span>
+        </div>
+    );
+}
+
+function Integration({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
+    return (
+        <article className="rounded-lg border border-line bg-white/70 p-4">
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-paper text-oxford">
+                    {icon}
+                </div>
+                <div>
+                    <h3 className="font-serif text-xl font-semibold">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-sage">{body}</p>
+                </div>
+            </div>
+        </article>
     );
 }
