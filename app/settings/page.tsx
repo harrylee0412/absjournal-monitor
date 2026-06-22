@@ -128,8 +128,11 @@ export default function SettingsPage() {
         }
     };
 
-    const saveSettings = async () => {
-        const smtpConfig = JSON.stringify({
+    const buildSmtpConfig = () => {
+        const hasSmtpConfig = smtpHost.trim() || smtpUser.trim() || smtpPass.trim() || fromEmail.trim();
+        if (!hasSmtpConfig) return undefined;
+
+        return JSON.stringify({
             host: smtpHost,
             port: parseInt(smtpPort),
             auth: {
@@ -138,12 +141,14 @@ export default function SettingsPage() {
             },
             from: fromEmail
         });
+    };
 
+    const saveSettings = async () => {
         try {
             await axios.post('/api/settings', {
                 emailEnabled,
                 targetEmail,
-                smtpConfig,
+                smtpConfig: buildSmtpConfig(),
                 preferredHour,
                 zoteroUserId: zoteroUserId || undefined,
                 zoteroApiKey: zoteroApiKey || undefined,
@@ -169,7 +174,7 @@ export default function SettingsPage() {
         <div className="max-w-2xl mx-auto space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-                <p className="text-muted-foreground mt-1">Configure email notifications and update schedule.</p>
+                <p className="text-muted-foreground mt-1">Configure receiving email, update schedule, translation, and integrations.</p>
             </div>
 
             <div className="bg-white shadow sm:rounded-lg p-6 space-y-6">
@@ -196,7 +201,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between border-t border-gray-200 pt-6">
                     <span className="flex-grow flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Enable Email Notifications</span>
-                        <span className="text-sm text-gray-500">Receive daily digests of new articles at your scheduled time.</span>
+                        <span className="text-sm text-gray-500">Receive daily digests and weekly topic summaries from the platform sender.</span>
                     </span>
                     <button
                         type="button"
@@ -215,7 +220,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Target Email</label>
+                    <label className="block text-sm font-medium text-gray-700">Receiving Email</label>
                     <input
                         type="email"
                         value={targetEmail}
@@ -223,12 +228,15 @@ export default function SettingsPage() {
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                         placeholder="you@example.com"
                     />
+                    <p className="mt-2 text-xs text-gray-500">
+                        平台会使用统一发件邮箱发送通知。普通用户只需要填写接收邮箱；SMTP 配置只作为高级备用。
+                    </p>
                 </div>
 
                 <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">SMTP Configuration</h3>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Advanced SMTP Fallback</h3>
                     <p className="text-xs text-gray-500 mb-4">
-                        如需按邮箱服务商配置 SMTP，请参考以下官方教程：
+                        默认走平台统一邮箱。只有当平台发信未配置时，系统才会尝试使用这里的个人 SMTP。
                         {' '}
                         <a href="https://support.google.com/mail/answer/7126229?hl=en" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">Gmail</a>
                         {' / '}
@@ -427,12 +435,8 @@ export default function SettingsPage() {
                             setZoteroTestResult(null);
                             try {
                                 // Save credentials first
-                                const smtpConfig = JSON.stringify({
-                                    host: smtpHost, port: parseInt(smtpPort),
-                                    auth: { user: smtpUser, pass: smtpPass }, from: fromEmail
-                                });
                                 await axios.post('/api/settings', {
-                                    emailEnabled, targetEmail, smtpConfig, preferredHour,
+                                    emailEnabled, targetEmail, smtpConfig: buildSmtpConfig(), preferredHour,
                                     zoteroUserId: zoteroUserId || undefined,
                                     zoteroApiKey: zoteroApiKey || undefined,
                                 });
@@ -460,12 +464,8 @@ export default function SettingsPage() {
                             setZoteroSyncResult(null);
                             try {
                                 // Save credentials first
-                                const smtpConfig = JSON.stringify({
-                                    host: smtpHost, port: parseInt(smtpPort),
-                                    auth: { user: smtpUser, pass: smtpPass }, from: fromEmail
-                                });
                                 await axios.post('/api/settings', {
-                                    emailEnabled, targetEmail, smtpConfig, preferredHour,
+                                    emailEnabled, targetEmail, smtpConfig: buildSmtpConfig(), preferredHour,
                                     zoteroUserId: zoteroUserId || undefined,
                                     zoteroApiKey: zoteroApiKey || undefined,
                                 });

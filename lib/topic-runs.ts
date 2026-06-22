@@ -1,5 +1,6 @@
 import { addDays, subDays } from 'date-fns';
 import { JobType, PrismaClient, TopicSubscription, UserSettings } from '@prisma/client';
+import { sendEmail } from '@/lib/email-provider';
 import { enqueueJob } from '@/lib/jobs';
 import { markdownToHtml, renderTopicSummaryMarkdown, SummaryArticle } from '@/lib/topic-summary';
 import { normalizeTranslateMode, translateText } from '@/lib/translator';
@@ -187,20 +188,19 @@ async function collectTopicSummaryArticles(topic: TopicSubscription, windowStart
 }
 
 async function sendTopicSummaryEmail(settings: UserSettings, topicName: string, markdown: string, paperCount: number) {
-    if (!settings.emailEnabled || !settings.smtpConfig || !settings.targetEmail) {
+    if (!settings.emailEnabled || !settings.targetEmail) {
         return { ok: false, skipped: true };
     }
 
     try {
-        const nodemailer = await import('nodemailer');
-        const config = JSON.parse(settings.smtpConfig);
-        const transporter = nodemailer.createTransport(config);
-        await transporter.sendMail({
-            from: config.from || settings.targetEmail,
-            to: settings.targetEmail,
-            subject: `[Journal Monitor] ${topicName} 周报：${paperCount} 篇匹配论文`,
-            text: markdown,
-            html: markdownToHtml(markdown)
+        await sendEmail({
+            targetEmail: settings.targetEmail,
+            smtpConfig: settings.smtpConfig,
+            message: {
+                subject: `[Journal Monitor] ${topicName} 周报：${paperCount} 篇匹配论文`,
+                text: markdown,
+                html: markdownToHtml(markdown)
+            }
         });
         return { ok: true };
     } catch (error) {

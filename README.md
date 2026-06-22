@@ -63,6 +63,15 @@ npm run worker
 - `BAIDU_TRANSLATE_APP_ID`
 - `BAIDU_TRANSLATE_SECRET`
 
+平台统一发信（推荐）：
+
+- `EMAIL_PROVIDER=resend`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`，例如 `Journal Monitor <updates@absjournal-monitor.tech>`
+- `EMAIL_REPLY_TO`（可选）
+
+配置平台发信后，用户只需要在 `/settings` 填写接收邮箱；个人 SMTP 只作为高级备用。
+
 不要把真实 API key 写进代码、README、测试快照或提交历史。用户 LLM key 会使用 `ENCRYPTION_SECRET` 加密保存。
 
 ## Main Routes
@@ -73,7 +82,7 @@ npm run worker
 - `/topics/new`：创建话题订阅。话题范围固定为当前已关注期刊。
 - `/journals`：关注/取消关注期刊，最多 30 本。
 - `/reports`：话题周报历史。
-- `/settings`：每日更新时间、SMTP、LLM 翻译、Zotero。
+- `/settings`：每日更新时间、接收邮箱、可选 SMTP 备用、LLM 翻译、Zotero。
 
 ## Cron
 
@@ -130,7 +139,7 @@ docker compose -f docker-compose.worker.yml up -d --build
 
 - 来源为最近 7 天的 `TopicArticleMatch`。
 - 翻译优先级：用户 LLM、百度翻译、原文。
-- 邮件发送复用用户当前 SMTP 设置和 `targetEmail`，通过 `EMAIL_DELIVERY` 后台任务异步完成。
+- 邮件发送优先使用平台统一发信（Resend），未配置平台发信时才退回用户 SMTP，并通过 `EMAIL_DELIVERY` 后台任务异步完成。
 
 ## CrossRef Fetching
 

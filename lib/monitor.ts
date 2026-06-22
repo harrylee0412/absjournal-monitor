@@ -1,6 +1,7 @@
 import { Article, Journal, PrismaClient, UserSettings } from '@prisma/client';
 import { fetchNewArticlesForJournal } from '@/lib/crossref';
 import { format } from 'date-fns';
+import { sendEmail } from '@/lib/email-provider';
 import { recordTopicMatchesForArticle } from '@/lib/topics';
 
 const prisma = new PrismaClient();
@@ -105,19 +106,7 @@ export async function updateArticlesForUser(userId: string, options?: { batchSiz
 
 // Send email to a specific user
 export async function sendNewArticlesEmailForUser(newArticles: ArticleWithJournal[], settings: UserSettings) {
-    if (!settings.smtpConfig || !settings.targetEmail) return;
-
-    const nodemailer = await import('nodemailer');
-
-    let transporter;
-    let fromEmail = settings.targetEmail;
-
-    try {
-        const config = JSON.parse(settings.smtpConfig);
-        transporter = nodemailer.createTransport(config);
-        if (config.from) fromEmail = config.from;
-    } catch (e) {
-        console.error("Invalid SMTP config", e);
+    if (!settings.emailEnabled || !settings.targetEmail) {
         return;
     }
 
@@ -138,11 +127,13 @@ export async function sendNewArticlesEmailForUser(newArticles: ArticleWithJourna
   `;
 
     try {
-        await transporter.sendMail({
-            from: fromEmail,
-            to: settings.targetEmail,
-            subject: `[Journal Monitor] ${newArticles.length} New Articles Found`,
-            html: htmlContent
+        await sendEmail({
+            targetEmail: settings.targetEmail,
+            smtpConfig: settings.smtpConfig,
+            message: {
+                subject: `[Journal Monitor] ${newArticles.length} New Articles Found`,
+                html: htmlContent
+            }
         });
         console.log(`Email sent to ${settings.targetEmail}`);
     } catch (e) {

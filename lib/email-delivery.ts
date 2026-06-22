@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { format } from 'date-fns';
+import { sendEmail } from '@/lib/email-provider';
 import { markdownToHtml } from '@/lib/topic-summary';
 
 export type EmailDeliveryPayload =
@@ -29,8 +30,8 @@ async function deliverNewArticlesEmail(prisma: PrismaClient, userId: string, art
     if (articleIds.length === 0) return { skipped: true, reason: 'No articles' };
 
     const settings = await prisma.userSettings.findUnique({ where: { userId } });
-    if (!settings?.emailEnabled || !settings.smtpConfig || !settings.targetEmail) {
-        return { skipped: true, reason: 'Email disabled or missing SMTP settings' };
+    if (!settings?.emailEnabled || !settings.targetEmail) {
+        return { skipped: true, reason: 'Email disabled or missing target email' };
     }
 
     const articles = await prisma.article.findMany({
@@ -60,12 +61,16 @@ async function deliverNewArticlesEmail(prisma: PrismaClient, userId: string, art
     <p style="font-size: 12px; color: #999;">This email was sent automatically by Journal Monitor</p>
   `;
 
-    await sendWithUserSmtp(settings.smtpConfig, settings.targetEmail, {
-        subject: `[Journal Monitor] ${articles.length} New Articles Found`,
-        html: htmlContent
+    const result = await sendEmail({
+        targetEmail: settings.targetEmail,
+        smtpConfig: settings.smtpConfig,
+        message: {
+            subject: `[Journal Monitor] ${articles.length} New Articles Found`,
+            html: htmlContent
+        }
     });
 
-    return { sent: true, articleCount: articles.length };
+    return { ...result, articleCount: articles.length };
 }
 
 async function deliverTopicSummaryEmail(
@@ -73,26 +78,30 @@ async function deliverTopicSummaryEmail(
     payload: Extract<EmailDeliveryPayload, { kind: 'TOPIC_SUMMARY' }>
 ) {
     const settings = await prisma.userSettings.findUnique({ where: { userId: payload.userId } });
-    if (!settings?.emailEnabled || !settings.smtpConfig || !settings.targetEmail) {
+    if (!settings?.emailEnabled || !settings.targetEmail) {
         await prisma.topicSummaryRun.update({
             where: { id: payload.runId },
             data: { deliveryStatus: 'SKIPPED' }
         }).catch(() => undefined);
-        return { skipped: true, reason: 'Email disabled or missing SMTP settings' };
+        return { skipped: true, reason: 'Email disabled or missing target email' };
     }
 
     try {
-        await sendWithUserSmtp(settings.smtpConfig, settings.targetEmail, {
-            subject: `[Journal Monitor] ${payload.topicName} 周报：${payload.paperCount} 篇匹配论文`,
-            text: payload.markdown,
-            html: markdownToHtml(payload.markdown)
+        const result = await sendEmail({
+            targetEmail: settings.targetEmail,
+            smtpConfig: settings.smtpConfig,
+            message: {
+                subject: `[Journal Monitor] ${payload.topicName} 周报：${payload.paperCount} 篇匹配论文`,
+                text: payload.markdown,
+                html: markdownToHtml(payload.markdown)
+            }
         });
 
         await prisma.topicSummaryRun.update({
             where: { id: payload.runId },
             data: { deliveryStatus: 'SENT', deliveryError: null }
         });
-        return { sent: true, paperCount: payload.paperCount };
+        return { ...result, paperCount: payload.paperCount };
     } catch (error) {
         await prisma.topicSummaryRun.update({
             where: { id: payload.runId },
@@ -103,23 +112,6 @@ async function deliverTopicSummaryEmail(
         }).catch(() => undefined);
         throw error;
     }
-}
-
-async function sendWithUserSmtp(
-    smtpConfig: string,
-    targetEmail: string,
-    message: { subject: string; html: string; text?: string }
-) {
-    const nodemailer = await import('nodemailer');
-    const config = JSON.parse(smtpConfig);
-    const transporter = nodemailer.createTransport(config);
-    await transporter.sendMail({
-        from: config.from || targetEmail,
-        to: targetEmail,
-        subject: message.subject,
-        text: message.text,
-        html: message.html
-    });
 }
 
 function escapeHtml(value: string) {
