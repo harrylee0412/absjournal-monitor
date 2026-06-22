@@ -41,7 +41,7 @@ const modules = [
     {
         icon: Settings,
         title: '账户设置',
-        description: '配置邮箱 SMTP、Zotero、LLM API；用户密钥在服务端加密保存。',
+        description: '配置接收邮箱、Zotero、LLM API；用户密钥在服务端加密保存。',
     },
     {
         icon: Download,
@@ -182,7 +182,7 @@ export default function WelcomePage() {
                             </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Integration icon={<Mail className="h-5 w-5" />} title="邮件推送" body="复用账户 SMTP 设置，把每日/每周结果发到你的目标邮箱。" />
+                            <Integration icon={<Mail className="h-5 w-5" />} title="邮件推送" body="平台统一邮箱发送每日/每周结果；用户只需要填写接收邮箱。" />
                             <Integration icon={<Languages className="h-5 w-5" />} title="摘要翻译" body="优先使用用户 LLM；失败后可降级到百度翻译；也可以选择不翻译。" />
                             <Integration icon={<KeyRound className="h-5 w-5" />} title="密钥保护" body="LLM API key 使用 ENCRYPTION_SECRET 加密保存，不写入代码和日志。" />
                             <Integration icon={<Database className="h-5 w-5" />} title="Neon 数据库" body="用户、期刊关注、话题命中、周报记录统一存储在 PostgreSQL。" />
