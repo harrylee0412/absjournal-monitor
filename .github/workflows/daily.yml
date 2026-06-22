@@ -1,13 +1,10 @@
-name: Hourly Journal Update
+name: Manual Worker Drain
 
 on:
-  schedule:
-    # Run every hour at :00
-    - cron: '0 * * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
-  update:
+  worker-once:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -21,7 +18,11 @@ jobs:
       
       - run: npx prisma generate
       
-      - run: npx tsx scripts/run-update.ts
+      - run: npm run worker:once
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
           CROSSREF_CONTACT_EMAIL: ${{ secrets.CROSSREF_CONTACT_EMAIL }}
+          ENCRYPTION_SECRET: ${{ secrets.ENCRYPTION_SECRET }}
+          BAIDU_TRANSLATE_APP_ID: ${{ secrets.BAIDU_TRANSLATE_APP_ID }}
+          BAIDU_TRANSLATE_SECRET: ${{ secrets.BAIDU_TRANSLATE_SECRET }}

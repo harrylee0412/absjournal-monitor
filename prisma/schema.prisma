@@ -21,6 +21,7 @@ model Journal {
   isCustom   Boolean   @default(false)  // User-added custom journal
   articles   Article[]
   followers  UserJournalFollow[]
+  fetchState JournalFetchState?
 }
 
 // Article table (globally shared)
@@ -85,6 +86,58 @@ model UserSettings {
   
   @@index([userId])
   @@index([preferredHour])
+}
+
+enum JobType {
+  USER_CHECK_UPDATE
+  DAILY_JOURNAL_FETCH
+  WEEKLY_TOPIC_SUMMARY
+  EMAIL_DELIVERY
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  RETRYING
+  SUCCESS
+  FAILED
+}
+
+model Job {
+  id           Int       @id @default(autoincrement())
+  type         JobType
+  status       JobStatus @default(PENDING)
+  userId       String?
+  payload      Json      @default("{}")
+  progress     Json      @default("{}")
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  runAfter     DateTime  @default(now())
+  lockedAt     DateTime?
+  lockOwner    String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, runAfter])
+  @@index([type, status])
+  @@index([userId])
+  @@index([lockedAt])
+}
+
+model JournalFetchState {
+  id                     Int       @id @default(autoincrement())
+  journalId              Int       @unique
+  lastFetchedAt          DateTime?
+  lastSuccessfulFromDate DateTime?
+  lastError              String?
+  lastItemCount          Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  journal                Journal   @relation(fields: [journalId], references: [id], onDelete: Cascade)
 }
 
 // Topic subscriptions run on top of the user's followed journals.

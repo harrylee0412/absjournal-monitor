@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { runWeeklyTopicSummaries } from '@/lib/topic-runs';
+import { JobType } from '@prisma/client';
+import { enqueueJob } from '@/lib/jobs';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
 
 export async function GET(request: Request) {
     return run(request);
@@ -17,19 +17,16 @@ async function run(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    try {
-        const results = await runWeeklyTopicSummaries();
-        return NextResponse.json({
-            success: true,
-            topicsProcessed: results.length,
-            results
-        });
-    } catch (error) {
-        console.error('Weekly summaries failed', error);
-        return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Weekly summaries failed'
-        }, { status: 500 });
-    }
+    const job = await enqueueJob({
+        type: JobType.WEEKLY_TOPIC_SUMMARY,
+        payload: { source: 'vercel-cron' }
+    });
+
+    return NextResponse.json({
+        success: true,
+        jobId: job.id,
+        status: job.status
+    }, { status: 202 });
 }
 
 function isAuthorized(request: Request) {

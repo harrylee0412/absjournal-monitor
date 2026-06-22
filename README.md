@@ -5,8 +5,9 @@
 核心链路：
 
 - 用户最多关注 30 本期刊。
-- 系统按关注期刊从 CrossRef 每日抓取新文章。
+- 系统按全局关注期刊从 CrossRef 每日抓取新文章，并分发给关注用户。
 - 用户可以在已关注期刊内创建话题订阅，按关键词匹配论文。
+- Vercel 只负责入队；Docker Worker 负责抓取、匹配、翻译和发信。
 - 每周自动生成话题摘要，可用用户 LLM 或百度翻译生成中文内容。
 - 保留邮件推送、RIS 导出、Zotero 同步和外部 API。
 
@@ -27,6 +28,18 @@ npm run dev
 npx prisma migrate deploy
 ```
 
+本地跑一次 worker：
+
+```bash
+npm run worker:once
+```
+
+常驻 worker：
+
+```bash
+npm run worker
+```
+
 ## Environment Variables
 
 必需：
@@ -39,6 +52,11 @@ npx prisma migrate deploy
 - `CROSSREF_CONTACT_EMAIL`
 - `CRON_SECRET`
 - `ENCRYPTION_SECRET`
+- `WORKER_CONCURRENCY`
+- `CROSSREF_CONCURRENCY`
+- `CROSSREF_MIN_INTERVAL_MS`
+- `JOB_LOCK_TTL_SECONDS`
+- `JOB_MAX_ATTEMPTS`
 
 翻译 fallback：
 
@@ -61,14 +79,41 @@ npx prisma migrate deploy
 
 `vercel.json` 配置了两个任务：
 
-- `/api/cron/check-updates`：每日抓取关注期刊文章。
-- `/api/cron/weekly-summaries`：每周一生成话题摘要。
+- `/api/cron/check-updates`：每日创建全局期刊抓取任务。
+- `/api/cron/weekly-summaries`：每周一创建话题摘要任务。
 
 如果设置了 `CRON_SECRET`，调用方需要发送：
 
 ```text
 Authorization: Bearer <CRON_SECRET>
 ```
+
+Cron route 不再执行重任务，只写入 `Job` 表。真正执行由 worker 完成。
+
+## Background Worker
+
+第一版 worker 使用 Neon `Job` 表作为轻量队列，不依赖 Redis。
+
+任务类型：
+
+- `USER_CHECK_UPDATE`：用户手动抓取。API 立即返回 `jobId`，前端轮询 `/api/jobs/:id`。
+- `DAILY_JOURNAL_FETCH`：每日全局期刊抓取。同一期刊只抓一次，再分发给所有关注用户。
+- `WEEKLY_TOPIC_SUMMARY`：生成每周话题周报，并创建邮件发送任务。
+- `EMAIL_DELIVERY`：发送普通订阅邮件或话题周报邮件。
+
+Worker 部署：
+
+```bash
+docker compose -f docker-compose.worker.yml up -d --build
+```
+
+推荐服务器起步配置：
+
+- 2 vCPU
+- 4GB RAM
+- 40GB SSD
+
+接近 1000 活跃用户或翻译任务明显增加时，升级到 4 vCPU / 8GB RAM。
 
 ## Topic Subscriptions
 
@@ -85,7 +130,16 @@ Authorization: Bearer <CRON_SECRET>
 
 - 来源为最近 7 天的 `TopicArticleMatch`。
 - 翻译优先级：用户 LLM、百度翻译、原文。
-- 邮件发送复用用户当前 SMTP 设置和 `targetEmail`。
+- 邮件发送复用用户当前 SMTP 设置和 `targetEmail`，通过 `EMAIL_DELIVERY` 后台任务异步完成。
+
+## CrossRef Fetching
+
+- 所有请求带 `mailto` 参数和 `User-Agent`，进入 CrossRef polite pool。
+- 首次抓取默认最近 30 天。
+- 增量抓取基于 `JournalFetchState.lastFetchedAt` 向前重叠 2 天，降低漏抓风险。
+- 请求 `rows=100`，按 `created desc` 排序。
+- DOI 全局唯一，重复文章不会重复写入 `Article`。
+- 同一期刊每天由 worker 全局抓一次，再分发给关注该期刊的用户。
 
 ## Data Import
 

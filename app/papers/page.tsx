@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { RefreshCw, Download, CheckCircle, Circle, ExternalLink, Search, AlertCircle } from 'lucide-react';
@@ -68,16 +68,17 @@ const initialMetrics: UpdateMetrics = {
 };
 
 const STALL_THRESHOLD_MS = 10000;
-const UPDATE_CHECKPOINT_KEY = 'journal-monitor:update-checkpoint:v1';
-const MAX_AUTO_RETRIES = 1;
-const AUTO_RETRY_DELAY_MS = 1500;
-
-type StreamMessage = {
-  type: string;
-  [key: string]: unknown;
-};
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 type UpdateRunState = 'idle' | 'running' | 'completed' | 'interrupted' | 'failed';
+
+type JobData = {
+  id: number;
+  status: 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | 'FAILED';
+  progress?: Record<string, unknown>;
+  lastError?: string | null;
+};
 
 export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -98,29 +99,19 @@ export default function Dashboard() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [topicId, setTopicId] = useState('');
   const [matchedOnly, setMatchedOnly] = useState(false);
-  const resumeIndexRef = useRef(0);
-
-  const readCheckpoint = () => {
-    if (typeof window === 'undefined') return 0;
-    const raw = window.localStorage.getItem(UPDATE_CHECKPOINT_KEY);
-    if (!raw) return 0;
-    const parsed = Number.parseInt(raw, 10);
-    if (!Number.isFinite(parsed) || parsed < 0) return 0;
-    return parsed;
-  };
-
-  const writeCheckpoint = (nextIndex: number | null) => {
-    if (typeof window === 'undefined') return;
-    if (nextIndex === null || nextIndex <= 0) {
-      window.localStorage.removeItem(UPDATE_CHECKPOINT_KEY);
-      return;
-    }
-    window.localStorage.setItem(UPDATE_CHECKPOINT_KEY, String(nextIndex));
-  };
 
   const sleep = (ms: number) => new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
+
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -199,265 +190,94 @@ export default function Dashboard() {
   };
 
   const checkForUpdates = async () => {
-    const savedCheckpoint = readCheckpoint();
-    let runStartIndex = savedCheckpoint > 0 ? savedCheckpoint : 0;
-
     setCheckingUpdates(true);
     setUpdateRunState('running');
-    setUpdateProgress([]);
-    setUpdateMetrics({
-      ...initialMetrics,
-      completedJournals: runStartIndex
-    });
+    setUpdateProgress(['Creating background update job...']);
+    setUpdateMetrics(initialMetrics);
     setLastEventAt(Date.now());
     setStallSeconds(0);
     setIsStalled(false);
-    resumeIndexRef.current = runStartIndex;
-
-    if (runStartIndex > 0) {
-      appendProgress(`Detected unfinished update. Resuming from journal ${runStartIndex + 1}...`);
-    }
-
-    const processBatch = async (startIndex: number): Promise<void> => {
-      const response = await fetch('/api/check-updates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startIndex })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to check updates');
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let nextIndex: number | null = null;
-      let hasMore = false;
-      let gotTaskComplete = false;
-
-      const handleMessage = (msg: StreamMessage) => {
-        setLastEventAt(Date.now());
-        setIsStalled(false);
-
-        if (msg.type === 'task_start') {
-          const totalJournals = Number(msg.totalJournals || 0);
-          const startIndex = Number(msg.startIndex || 0);
-          const clampedStart = totalJournals > 0
-            ? Math.min(startIndex, totalJournals)
-            : startIndex;
-
-          setUpdateMetrics(prev => ({
-            ...prev,
-            totalJournals: totalJournals || prev.totalJournals,
-            completedJournals: Math.max(prev.completedJournals, clampedStart)
-          }));
-          resumeIndexRef.current = clampedStart;
-          writeCheckpoint(clampedStart > 0 ? clampedStart : null);
-          appendProgress(`Starting update for ${totalJournals} journals...`);
-          return;
-        }
-
-        if (msg.type === 'journal_start') {
-          const index = Number(msg.index || 0);
-          const journal = String(msg.journal || 'Unknown Journal');
-
-          setUpdateMetrics(prev => ({
-            ...prev,
-            currentJournalIndex: index,
-            currentJournalTitle: journal,
-            currentJournalProcessedWorks: 0,
-            currentJournalTotalWorks: 0
-          }));
-          appendProgress(`[${index}] Checking ${journal}...`);
-          return;
-        }
-
-        if (msg.type === 'journal_progress') {
-          const processedWorks = Number(msg.processedWorks || 0);
-          const totalWorks = Number(msg.totalWorks || 0);
-          setUpdateMetrics(prev => ({
-            ...prev,
-            currentJournalProcessedWorks: processedWorks,
-            currentJournalTotalWorks: totalWorks
-          }));
-          return;
-        }
-
-        if (msg.type === 'journal_timeout') {
-          const index = Number(msg.index || 0);
-          const journal = String(msg.journal || 'Unknown Journal');
-          appendProgress(`[${index}] ${journal}: timeout, skipped`);
-          return;
-        }
-
-        if (msg.type === 'task_budget_exhausted') {
-          const index = Number(msg.index || 0);
-          appendProgress(`Approaching request timeout, pausing before journal ${index}...`);
-          return;
-        }
-
-        if (msg.type === 'journal_done') {
-          const index = Number(msg.index || 0);
-          const journal = String(msg.journal || 'Unknown Journal');
-          const status = String(msg.status || 'done');
-          const newArticles = Number(msg.newArticles || 0);
-          const completedJournals = Number(msg.completedJournals || 0);
-          const totalJournals = Number(msg.totalJournals || updateMetrics.totalJournals);
-          const processedWorks = Number(msg.processedWorks || 0);
-          const totalWorks = Number(msg.totalWorks || 0);
-
-          setUpdateMetrics(prev => {
-            const next = { ...prev };
-            next.completedJournals = Math.max(prev.completedJournals, completedJournals);
-            if (totalJournals > 0) next.totalJournals = totalJournals;
-            next.totalNewArticles = prev.totalNewArticles + (status === 'done' ? newArticles : 0);
-            next.currentJournalProcessedWorks = Math.max(prev.currentJournalProcessedWorks, processedWorks);
-            next.currentJournalTotalWorks = Math.max(prev.currentJournalTotalWorks, totalWorks);
-
-            if (status === 'done') next.doneJournals += 1;
-            if (status === 'skip') next.skippedJournals += 1;
-            if (status === 'error') next.errorJournals += 1;
-            if (status === 'timeout') next.timeoutJournals += 1;
-
-            return next;
-          });
-
-          const checkpoint = Math.max(0, completedJournals);
-          resumeIndexRef.current = checkpoint;
-          writeCheckpoint(checkpoint > 0 ? checkpoint : null);
-
-          if (status === 'done') appendProgress(`[${index}] ${journal}: ${newArticles} new`);
-          if (status === 'skip') appendProgress(`[${index}] ${journal}: skipped`);
-          if (status === 'error') appendProgress(`[${index}] ${journal}: failed`);
-          if (status === 'timeout') appendProgress(`[${index}] ${journal}: timeout`);
-          return;
-        }
-
-        if (msg.type === 'task_complete') {
-          gotTaskComplete = true;
-          const doneJournals = Number(msg.doneJournals || 0);
-          const skippedJournals = Number(msg.skippedJournals || 0);
-          const errorJournals = Number(msg.errorJournals || 0);
-          const timeoutJournals = Number(msg.timeoutJournals || 0);
-          const completedJournals = Number(msg.completedJournals || 0);
-          const totalNewArticles = Number(msg.totalNewArticles || 0);
-          const totalJournals = Number(msg.totalJournals || updateMetrics.totalJournals);
-
-          setUpdateMetrics(prev => ({
-            ...prev,
-            totalJournals: totalJournals || prev.totalJournals,
-            completedJournals: Math.max(prev.completedJournals, completedJournals),
-            doneJournals: Math.max(prev.doneJournals, doneJournals),
-            skippedJournals: Math.max(prev.skippedJournals, skippedJournals),
-            errorJournals: Math.max(prev.errorJournals, errorJournals),
-            timeoutJournals: Math.max(prev.timeoutJournals, timeoutJournals),
-            totalNewArticles: Math.max(prev.totalNewArticles, totalNewArticles)
-          }));
-
-          hasMore = Boolean(msg.hasMore);
-          nextIndex = typeof msg.nextIndex === 'number' ? msg.nextIndex : null;
-          const checkpoint = hasMore && nextIndex !== null ? nextIndex : null;
-          resumeIndexRef.current = checkpoint ?? 0;
-          writeCheckpoint(checkpoint);
-
-          if (!hasMore) {
-            appendProgress(`All done. Found ${totalNewArticles} new articles.`);
-          } else {
-            appendProgress(`Batch done. Continuing from journal ${Number(nextIndex || 0) + 1}...`);
-          }
-          return;
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          try {
-            const msg = JSON.parse(trimmed) as StreamMessage;
-            handleMessage(msg);
-          } catch {
-            // Ignore malformed line and continue processing stream.
-          }
-        }
-      }
-
-      const flushText = decoder.decode();
-      if (flushText) buffer += flushText;
-      if (buffer.trim()) {
-        try {
-          const msg = JSON.parse(buffer.trim()) as StreamMessage;
-          handleMessage(msg);
-        } catch {
-          // Ignore malformed tail.
-        }
-      }
-
-      if (!gotTaskComplete) {
-        throw new Error('Update stream interrupted before completion');
-      }
-
-      if (hasMore && nextIndex === null) {
-        throw new Error('Stream requested continuation but nextIndex is missing');
-      }
-
-      if (hasMore && nextIndex !== null) {
-        await processBatch(nextIndex);
-      }
-    };
 
     try {
-      let retryCount = 0;
-      while (true) {
-        try {
-          await processBatch(runStartIndex);
-          break;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown error';
-          const interrupted = message.toLowerCase().includes('interrupted');
+      const createRes = await axios.post('/api/check-updates');
+      const jobId = Number(createRes.data.jobId);
+      if (!Number.isFinite(jobId)) throw new Error('Update job was not created');
 
-          if (interrupted && retryCount < MAX_AUTO_RETRIES) {
-            retryCount += 1;
-            runStartIndex = Math.max(0, resumeIndexRef.current);
-            appendProgress(`Stream interrupted. Auto-retrying (${retryCount}/${MAX_AUTO_RETRIES}) from journal ${runStartIndex + 1}...`);
-            await sleep(AUTO_RETRY_DELAY_MS);
-            continue;
-          }
+      appendProgress(`Job #${jobId} queued. Worker will process it in the background.`);
+      const startedAt = Date.now();
+      let lastLoggedStatus = '';
+      let lastLoggedCompleted = -1;
 
-          throw error;
+      while (Date.now() - startedAt < JOB_POLL_TIMEOUT_MS) {
+        const jobRes = await axios.get(`/api/jobs/${jobId}`);
+        const job = jobRes.data.data as JobData;
+        const progress = job.progress || {};
+        setLastEventAt(Date.now());
+        setIsStalled(false);
+        applyJobProgress(progress);
+
+        const completed = toNumber(progress.completedJournals);
+        const total = toNumber(progress.totalJournals);
+        const currentJournal = typeof progress.currentJournalTitle === 'string' ? progress.currentJournalTitle : '';
+        const statusLine = `${job.status}:${completed}:${currentJournal}`;
+
+        if (job.status !== lastLoggedStatus) {
+          appendProgress(`Job status: ${job.status}`);
+          lastLoggedStatus = job.status;
+        }
+
+        if (completed !== lastLoggedCompleted && total > 0) {
+          appendProgress(`Progress: ${completed}/${total}${currentJournal ? ` · ${currentJournal}` : ''}`);
+          lastLoggedCompleted = completed;
+        }
+
+        if (job.status === 'SUCCESS') {
+          appendProgress(`All done. Found ${toNumber(progress.totalNewArticles)} new global articles, distributed ${toNumber(progress.totalDistributedArticles)} user articles.`);
+          await fetchArticles();
+          setUpdateRunState('completed');
+          return;
+        }
+
+        if (job.status === 'FAILED') {
+          throw new Error(job.lastError || 'Update job failed');
+        }
+
+        if (statusLine) {
+          await sleep(JOB_POLL_INTERVAL_MS);
         }
       }
 
-      await fetchArticles();
-      setUpdateRunState('completed');
+      throw new Error('Update job polling timed out');
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Unknown error';
-      const interrupted = message.toLowerCase().includes('interrupted');
-      setUpdateRunState(interrupted ? 'interrupted' : 'failed');
-      appendProgress(interrupted
-        ? 'Update stream was interrupted unexpectedly. Please retry.'
-        : 'Failed to check for updates');
+      setUpdateRunState('failed');
+      appendProgress(e instanceof Error ? e.message : 'Failed to check for updates');
       console.error(e);
     } finally {
       setCheckingUpdates(false);
       setIsStalled(false);
       setStallSeconds(0);
     }
+  };
+
+  const applyJobProgress = (progress: Record<string, unknown>) => {
+    const totalJournals = toNumber(progress.totalJournals);
+    const completedJournals = toNumber(progress.completedJournals);
+    const errorJournals = toNumber(progress.errorJournals);
+    const currentJournalTitle = typeof progress.currentJournalTitle === 'string' ? progress.currentJournalTitle : null;
+    const currentJournalItems = toNumber(progress.currentJournalItems);
+
+    setUpdateMetrics(prev => ({
+      ...prev,
+      totalJournals: totalJournals || prev.totalJournals,
+      completedJournals: Math.max(prev.completedJournals, completedJournals),
+      doneJournals: Math.max(0, completedJournals - errorJournals),
+      errorJournals,
+      totalNewArticles: toNumber(progress.totalNewArticles),
+      currentJournalIndex: null,
+      currentJournalTitle,
+      currentJournalProcessedWorks: currentJournalItems,
+      currentJournalTotalWorks: currentJournalItems
+    }));
   };
 
   const toggleReadStatus = async (id: number, current: boolean) => {

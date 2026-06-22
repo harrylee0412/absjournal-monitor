@@ -83,9 +83,10 @@ export async function fetchNewArticlesForJournal(issn: string, fromDate?: Date, 
             const response = await axios.get(CROSSREF_API_URL, {
                 params: {
                     filter,
-                    rows: 50,
+                    rows: 100,
                     sort: 'created',
-                    order: 'desc'
+                    order: 'desc',
+                    mailto: process.env.CROSSREF_CONTACT_EMAIL || 'test@test.com'
                 },
                 headers: {
                     'User-Agent': `JournalMonitor/1.0 (mailto:${process.env.CROSSREF_CONTACT_EMAIL || 'test@test.com'})`
@@ -122,5 +123,4 @@ export async function fetchNewArticlesForJournal(issn: string, fromDate?: Date, 
 
     throw new Error(`Failed fetching CrossRef data for ISSN ${issn}`);
 }
-
 

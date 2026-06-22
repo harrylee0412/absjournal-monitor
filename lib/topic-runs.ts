@@ -1,5 +1,6 @@
 import { addDays, subDays } from 'date-fns';
-import { PrismaClient, TopicSubscription, UserSettings } from '@prisma/client';
+import { JobType, PrismaClient, TopicSubscription, UserSettings } from '@prisma/client';
+import { enqueueJob } from '@/lib/jobs';
 import { markdownToHtml, renderTopicSummaryMarkdown, SummaryArticle } from '@/lib/topic-summary';
 import { normalizeTranslateMode, translateText } from '@/lib/translator';
 
@@ -10,6 +11,7 @@ export type TopicRunOptions = {
     topicId?: number;
     windowStart?: Date;
     windowEnd?: Date;
+    enqueueEmails?: boolean;
 };
 
 export async function runWeeklyTopicSummaries(options: TopicRunOptions = {}) {
@@ -27,7 +29,7 @@ export async function runWeeklyTopicSummaries(options: TopicRunOptions = {}) {
 
     const results = [];
     for (const topic of topics) {
-        results.push(await runTopicSummary(topic, windowStart, windowEnd));
+        results.push(await runTopicSummary(topic, windowStart, windowEnd, options));
     }
     return results;
 }
@@ -54,7 +56,7 @@ export async function previewTopicSummary(userId: string, topicId: number) {
     };
 }
 
-async function runTopicSummary(topic: TopicSubscription, windowStart: Date, windowEnd: Date) {
+async function runTopicSummary(topic: TopicSubscription, windowStart: Date, windowEnd: Date, options: TopicRunOptions = {}) {
     const run = await prisma.topicSummaryRun.create({
         data: {
             userId: topic.userId,
@@ -88,10 +90,26 @@ async function runTopicSummary(topic: TopicSubscription, windowStart: Date, wind
         let deliveryStatus: string | null = 'SKIPPED';
         let deliveryError: string | null = null;
         if (topic.deliveryEnabled) {
-            const settings = await prisma.userSettings.findUnique({ where: { userId: topic.userId } });
-            const sent = settings ? await sendTopicSummaryEmail(settings, topic.name, summaryMarkdown, articles.length) : { ok: false, skipped: true };
-            deliveryStatus = sent.ok ? 'SENT' : sent.skipped ? 'SKIPPED' : 'FAILED';
-            deliveryError = sent.error || null;
+            if (options.enqueueEmails) {
+                await enqueueJob({
+                    type: JobType.EMAIL_DELIVERY,
+                    userId: topic.userId,
+                    payload: {
+                        kind: 'TOPIC_SUMMARY',
+                        userId: topic.userId,
+                        runId: run.id,
+                        topicName: topic.name,
+                        markdown: summaryMarkdown,
+                        paperCount: articles.length
+                    }
+                }, prisma);
+                deliveryStatus = 'QUEUED';
+            } else {
+                const settings = await prisma.userSettings.findUnique({ where: { userId: topic.userId } });
+                const sent = settings ? await sendTopicSummaryEmail(settings, topic.name, summaryMarkdown, articles.length) : { ok: false, skipped: true };
+                deliveryStatus = sent.ok ? 'SENT' : sent.skipped ? 'SKIPPED' : 'FAILED';
+                deliveryError = sent.error || null;
+            }
         }
 
         await prisma.topicSummaryRun.update({
