@@ -69,7 +69,8 @@ const initialMetrics: UpdateMetrics = {
 
 const STALL_THRESHOLD_MS = 10000;
 const JOB_POLL_INTERVAL_MS = 2000;
-const JOB_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+// The free-tier worker may sleep for up to 30 minutes between idle checks.
+const JOB_POLL_TIMEOUT_MS = 45 * 60 * 1000;
 
 type UpdateRunState = 'idle' | 'running' | 'completed' | 'interrupted' | 'failed';
 

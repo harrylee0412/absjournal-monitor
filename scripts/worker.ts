@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { Job, PrismaClient } from '@prisma/client';
 import { claimNextJob, failJob, getEnvNumber } from '@/lib/jobs';
 import { processJob } from '@/lib/job-worker';
 
@@ -8,7 +8,9 @@ const args = new Set(process.argv.slice(2));
 const once = args.has('--once');
 const dryRun = args.has('--dry-run');
 const lockOwner = `${process.env.WORKER_NAME || 'journal-worker'}-${process.pid}`;
-const pollIntervalMs = getEnvNumber('WORKER_POLL_INTERVAL_MS', 5000, 500);
+// Keep idle polling above Neon's five-minute scale-to-zero window. A short
+// interval keeps the database compute awake even when there is no work.
+const pollIntervalMs = getEnvNumber('WORKER_POLL_INTERVAL_MS', 30 * 60 * 1000, 6 * 60 * 1000);
 const workerConcurrency = getEnvNumber('WORKER_CONCURRENCY', 4, 1);
 
 let stopping = false;
@@ -30,19 +32,35 @@ async function main() {
     console.log(`Worker ${lockOwner} started. concurrency=${workerConcurrency}, once=${once}`);
 
     do {
-        const processed = await processAvailableJobs();
+        let processed = 0;
+
+        try {
+            processed = await processAvailableJobs();
+        } catch (error) {
+            if (once) throw error;
+
+            console.error(`Queue poll failed. Retrying in ${pollIntervalMs}ms.`, error);
+            await prisma.$disconnect();
+            await sleep(pollIntervalMs);
+            continue;
+        }
+
         if (once) break;
         if (processed === 0) await sleep(pollIntervalMs);
     } while (!stopping);
 }
 
 async function processAvailableJobs() {
-    let processed = 0;
-    const workers = Array.from({ length: workerConcurrency }, async () => {
-        while (!stopping) {
-            const job = await claimNextJob(lockOwner, prisma);
-            if (!job) return;
+    // Probe the queue once before starting concurrent consumers. Previously,
+    // every idle poll issued one query per concurrency slot.
+    const firstJob = await claimNextJob(lockOwner, prisma);
+    if (!firstJob) return 0;
 
+    let processed = 0;
+    const runWorker = async (initialJob?: Job) => {
+        let job = initialJob || await claimNextJob(lockOwner, prisma);
+
+        while (!stopping && job) {
             processed++;
             console.log(`Processing job ${job.id} (${job.type}) attempt=${job.attempts + 1}/${job.maxAttempts}`);
             try {
@@ -54,8 +72,14 @@ async function processAvailableJobs() {
             }
 
             if (once) return;
+            job = await claimNextJob(lockOwner, prisma);
         }
-    });
+    };
+
+    const workers = [
+        runWorker(firstJob),
+        ...Array.from({ length: workerConcurrency - 1 }, () => runWorker())
+    ];
 
     await Promise.all(workers);
     return processed;

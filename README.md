@@ -40,6 +40,10 @@ npm run worker:once
 npm run worker
 ```
 
+常驻 worker 在队列空闲时默认每 30 分钟检查一次，并且每轮只执行一次空队列查询，
+让 Neon compute 有时间 scale to zero。付费数据库可以按任务延迟要求缩短间隔；
+Neon Free 不应设置为 5 分钟或更短。
+
 ## Environment Variables
 
 必需：
@@ -53,6 +57,7 @@ npm run worker
 - `CRON_SECRET`
 - `ENCRYPTION_SECRET`
 - `WORKER_CONCURRENCY`
+- `WORKER_POLL_INTERVAL_MS`（默认 30 分钟，必须大于 Neon Free 的 5 分钟休眠窗口）
 - `CROSSREF_CONCURRENCY`
 - `CROSSREF_MIN_INTERVAL_MS`
 - `JOB_LOCK_TTL_SECONDS`
