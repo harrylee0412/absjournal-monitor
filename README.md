@@ -82,7 +82,7 @@ Neon Free 不应设置为 5 分钟或更短。
 ## Main Routes
 
 - `/`：研究监控 Dashboard。
-- `/papers`：每日文章 Feed，支持搜索、未读筛选、话题筛选、RIS 导出和手动抓取。
+- `/papers`：每日文章 Feed，支持搜索、未读筛选、话题筛选和 RIS 导出。
 - `/topics`：话题订阅列表。
 - `/topics/new`：创建话题订阅。话题范围固定为当前已关注期刊。
 - `/journals`：关注/取消关注期刊，最多 30 本。
@@ -93,7 +93,7 @@ Neon Free 不应设置为 5 分钟或更短。
 
 `vercel.json` 配置了两个任务：
 
-- `/api/cron/check-updates`：每日创建全局期刊抓取任务。
+- `/api/cron/check-updates`：每天 UTC 08:00（北京时间 16:00）创建全局期刊抓取任务。
 - `/api/cron/weekly-summaries`：每周一创建话题摘要任务。
 
 如果设置了 `CRON_SECRET`，调用方需要发送：
@@ -110,7 +110,6 @@ Cron route 不再执行重任务，只写入 `Job` 表。真正执行由 worker 
 
 任务类型：
 
-- `USER_CHECK_UPDATE`：用户手动抓取。API 立即返回 `jobId`，前端轮询 `/api/jobs/:id`。
 - `DAILY_JOURNAL_FETCH`：每日全局期刊抓取。同一期刊只抓一次，再分发给所有关注用户。
 - `WEEKLY_TOPIC_SUMMARY`：生成每周话题周报，并创建邮件发送任务。
 - `EMAIL_DELIVERY`：发送普通订阅邮件或话题周报邮件。

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { RefreshCw, Download, CheckCircle, Circle, ExternalLink, Search, AlertCircle } from 'lucide-react';
+import { Download, CheckCircle, Circle, ExternalLink, Search } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -39,80 +39,18 @@ interface Topic {
 type SearchMode = 'hybrid' | 'fts' | 'trigram';
 type SortMode = 'relevance' | 'date_desc';
 
-interface UpdateMetrics {
-  totalJournals: number;
-  completedJournals: number;
-  doneJournals: number;
-  skippedJournals: number;
-  errorJournals: number;
-  timeoutJournals: number;
-  totalNewArticles: number;
-  currentJournalIndex: number | null;
-  currentJournalTitle: string | null;
-  currentJournalProcessedWorks: number;
-  currentJournalTotalWorks: number;
-}
-
-const initialMetrics: UpdateMetrics = {
-  totalJournals: 0,
-  completedJournals: 0,
-  doneJournals: 0,
-  skippedJournals: 0,
-  errorJournals: 0,
-  timeoutJournals: 0,
-  totalNewArticles: 0,
-  currentJournalIndex: null,
-  currentJournalTitle: null,
-  currentJournalProcessedWorks: 0,
-  currentJournalTotalWorks: 0
-};
-
-const STALL_THRESHOLD_MS = 10000;
-const JOB_POLL_INTERVAL_MS = 2000;
-// The free-tier worker may sleep for up to 30 minutes between idle checks.
-const JOB_POLL_TIMEOUT_MS = 45 * 60 * 1000;
-
-type UpdateRunState = 'idle' | 'running' | 'completed' | 'interrupted' | 'failed';
-
-type JobData = {
-  id: number;
-  status: 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | 'FAILED';
-  progress?: Record<string, unknown>;
-  lastError?: string | null;
-};
-
 export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkingUpdates, setCheckingUpdates] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState<string[]>([]);
-  const [updateMetrics, setUpdateMetrics] = useState<UpdateMetrics>(initialMetrics);
-  const [lastEventAt, setLastEventAt] = useState<number | null>(null);
-  const [stallSeconds, setStallSeconds] = useState(0);
-  const [isStalled, setIsStalled] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(true);
   const [selectedArticles, setSelectedArticles] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
-  const [updateRunState, setUpdateRunState] = useState<UpdateRunState>('idle');
   const [topics, setTopics] = useState<Topic[]>([]);
   const [topicId, setTopicId] = useState('');
   const [matchedOnly, setMatchedOnly] = useState(false);
-
-  const sleep = (ms: number) => new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-  const toNumber = (value: unknown) => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    if (typeof value === 'string') {
-      const parsed = Number.parseInt(value, 10);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -169,118 +107,6 @@ export default function Dashboard() {
       .catch(() => setTopics([]));
   }, []);
 
-  useEffect(() => {
-    if (!checkingUpdates) {
-      setIsStalled(false);
-      setStallSeconds(0);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      if (!lastEventAt) return;
-      const idleMs = Date.now() - lastEventAt;
-      setStallSeconds(Math.floor(idleMs / 1000));
-      setIsStalled(idleMs > STALL_THRESHOLD_MS);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [checkingUpdates, lastEventAt]);
-
-  const appendProgress = (message: string) => {
-    setUpdateProgress(prev => [...prev, message]);
-  };
-
-  const checkForUpdates = async () => {
-    setCheckingUpdates(true);
-    setUpdateRunState('running');
-    setUpdateProgress(['Creating background update job...']);
-    setUpdateMetrics(initialMetrics);
-    setLastEventAt(Date.now());
-    setStallSeconds(0);
-    setIsStalled(false);
-
-    try {
-      const createRes = await axios.post('/api/check-updates');
-      const jobId = Number(createRes.data.jobId);
-      if (!Number.isFinite(jobId)) throw new Error('Update job was not created');
-
-      appendProgress(`Job #${jobId} queued. Worker will process it in the background.`);
-      const startedAt = Date.now();
-      let lastLoggedStatus = '';
-      let lastLoggedCompleted = -1;
-
-      while (Date.now() - startedAt < JOB_POLL_TIMEOUT_MS) {
-        const jobRes = await axios.get(`/api/jobs/${jobId}`);
-        const job = jobRes.data.data as JobData;
-        const progress = job.progress || {};
-        setLastEventAt(Date.now());
-        setIsStalled(false);
-        applyJobProgress(progress);
-
-        const completed = toNumber(progress.completedJournals);
-        const total = toNumber(progress.totalJournals);
-        const currentJournal = typeof progress.currentJournalTitle === 'string' ? progress.currentJournalTitle : '';
-        const statusLine = `${job.status}:${completed}:${currentJournal}`;
-
-        if (job.status !== lastLoggedStatus) {
-          appendProgress(`Job status: ${job.status}`);
-          lastLoggedStatus = job.status;
-        }
-
-        if (completed !== lastLoggedCompleted && total > 0) {
-          appendProgress(`Progress: ${completed}/${total}${currentJournal ? ` · ${currentJournal}` : ''}`);
-          lastLoggedCompleted = completed;
-        }
-
-        if (job.status === 'SUCCESS') {
-          appendProgress(`All done. Found ${toNumber(progress.totalNewArticles)} new global articles, distributed ${toNumber(progress.totalDistributedArticles)} user articles.`);
-          await fetchArticles();
-          setUpdateRunState('completed');
-          return;
-        }
-
-        if (job.status === 'FAILED') {
-          throw new Error(job.lastError || 'Update job failed');
-        }
-
-        if (statusLine) {
-          await sleep(JOB_POLL_INTERVAL_MS);
-        }
-      }
-
-      throw new Error('Update job polling timed out');
-    } catch (e) {
-      setUpdateRunState('failed');
-      appendProgress(e instanceof Error ? e.message : 'Failed to check for updates');
-      console.error(e);
-    } finally {
-      setCheckingUpdates(false);
-      setIsStalled(false);
-      setStallSeconds(0);
-    }
-  };
-
-  const applyJobProgress = (progress: Record<string, unknown>) => {
-    const totalJournals = toNumber(progress.totalJournals);
-    const completedJournals = toNumber(progress.completedJournals);
-    const errorJournals = toNumber(progress.errorJournals);
-    const currentJournalTitle = typeof progress.currentJournalTitle === 'string' ? progress.currentJournalTitle : null;
-    const currentJournalItems = toNumber(progress.currentJournalItems);
-
-    setUpdateMetrics(prev => ({
-      ...prev,
-      totalJournals: totalJournals || prev.totalJournals,
-      completedJournals: Math.max(prev.completedJournals, completedJournals),
-      doneJournals: Math.max(0, completedJournals - errorJournals),
-      errorJournals,
-      totalNewArticles: toNumber(progress.totalNewArticles),
-      currentJournalIndex: null,
-      currentJournalTitle,
-      currentJournalProcessedWorks: currentJournalItems,
-      currentJournalTotalWorks: currentJournalItems
-    }));
-  };
-
   const toggleReadStatus = async (id: number, current: boolean) => {
     setArticles(prev => prev.map(a => a.id === id ? { ...a, isRead: !current } : a));
     try {
@@ -328,42 +154,16 @@ export default function Dashboard() {
     link.click();
   };
 
-  const mainProgressPercent = updateMetrics.totalJournals > 0
-    ? Math.min(100, Math.round((updateMetrics.completedJournals / updateMetrics.totalJournals) * 100))
-    : 0;
-
-  const subProgressPercent = updateMetrics.currentJournalTotalWorks > 0
-    ? Math.min(100, Math.round((updateMetrics.currentJournalProcessedWorks / updateMetrics.currentJournalTotalWorks) * 100))
-    : 0;
-
-  const statusText = checkingUpdates
-    ? 'Running'
-    : (updateRunState === 'completed'
-      ? 'Completed'
-      : updateRunState === 'interrupted'
-        ? 'Interrupted'
-        : updateRunState === 'failed'
-          ? 'Failed'
-          : 'Idle');
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 border-b border-line pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-oxford">Papers Inbox</p>
           <h1 className="font-serif text-4xl font-semibold text-ink">论文收件箱</h1>
-          <p className="mt-1 text-sage">来自你关注期刊的每日更新，可按话题命中过滤。</p>
+          <p className="mt-1 text-sage">系统每天北京时间16:00检查关注期刊，有新文献时会推送到你的邮箱。</p>
         </div>
 
         <div className="flex space-x-2">
-          <button
-            onClick={checkForUpdates}
-            disabled={checkingUpdates}
-            className="btn"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${checkingUpdates ? 'animate-spin' : ''}`} />
-            {checkingUpdates ? '抓取中...' : '手动抓取'}
-          </button>
           <button
             onClick={exportRis}
             disabled={selectedArticles.length === 0}
@@ -440,77 +240,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {updateProgress.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto shadow-inner">
-          <div className="mb-4 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-300">Update status</span>
-              <span
-                className={
-                  updateRunState === 'failed' || updateRunState === 'interrupted'
-                    ? 'text-red-300'
-                    : updateRunState === 'completed'
-                      ? 'text-emerald-300'
-                      : 'text-cyan-300'
-                }
-              >
-                {statusText}
-              </span>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-gray-300 mb-1">
-                <span>Journal progress</span>
-                <span>{updateMetrics.completedJournals}/{Math.max(updateMetrics.totalJournals, 1)}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${mainProgressPercent}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-gray-300 mb-1">
-                <span>
-                  Current journal: {updateMetrics.currentJournalIndex ? `[${updateMetrics.currentJournalIndex}] ` : ''}
-                  {updateMetrics.currentJournalTitle || 'Waiting...'}
-                </span>
-                <span>{updateMetrics.currentJournalProcessedWorks}/{updateMetrics.currentJournalTotalWorks}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-cyan-500 to-blue-400 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${subProgressPercent}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-400">
-              done: {updateMetrics.doneJournals} | skipped: {updateMetrics.skippedJournals} | errors: {updateMetrics.errorJournals} | timeouts: {updateMetrics.timeoutJournals}
-            </div>
-
-            {isStalled && checkingUpdates && (
-              <div className="flex items-center text-amber-300 text-xs gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>No new update events for {stallSeconds}s. Still running and waiting for backend work.</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1 font-mono text-sm">
-            {updateProgress.map((msg, idx) => (
-              <div key={idx} className="text-green-400">{msg}</div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="panel overflow-hidden">
         <ul className="divide-y divide-gray-200">
           {articles.length === 0 && !loading && (
-            <li className="p-12 text-center text-gray-500">No articles found. Try adjusting filters, keywords, or checking updates.</li>
+            <li className="p-12 text-center text-gray-500">暂无文献，请调整筛选条件或关键词。</li>
           )}
           {articles.map((article) => (
             <li key={article.id} className={`hover:bg-gray-50 transition-colors ${article.isRead ? 'opacity-60 bg-gray-50' : 'bg-white'}`}>
