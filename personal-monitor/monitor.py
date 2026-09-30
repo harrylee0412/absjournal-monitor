@@ -33,6 +33,13 @@ INDEX_EN = "Listed for reference; not selected for a detailed summary."
 INDEX_ZH = "收录于文献索引，未选为详细摘要。"
 MISSING_ZH = "未获取到原文摘要，仅凭元数据无法判断研究结论、方法与启示。"
 EXCLUDED = re.compile(r"^(?:correction(?:\s+to)?|corrigendum|erratum|retraction|editorial(?:\s|:|$)|book\s+review|review\s+of\s+books?|acknowledg(?:e)?ment(?:s)?|list\s+of\s+reviewers|front\s+matter|back\s+matter|issue\s+information|contents(?:\s|:|$))", re.I)
+# A terminal notice label needs a punctuation delimiter, so research about
+# error correction or retraction is not mistaken for a publication notice.
+NOTICE_SUFFIX = re.compile(
+    r"(?:\s*[-–—:]\s*(?:correction|corrigendum|erratum|retraction)(?:\s+notice)?[.!]?"
+    r"|\s*[\[(](?:correction|corrigendum|erratum|retraction)(?:\s+notice)?[\])][.!]?)\s*$",
+    re.I,
+)
 NUMBER = re.compile(r"(?<![A-Za-z0-9_])[-+−]?\d[\d,]*(?:\.\d+)?(?:\s*%)?(?![A-Za-z0-9_])")
 
 class MonitorError(Exception):
@@ -187,7 +194,7 @@ def make_paper(raw, journal, issn, fetched_at):
     if not title:
         return None, "missing_title"
     subtype = str(raw.get("subtype") or "").lower()
-    if EXCLUDED.search(title) or subtype in {"editorial", "correction", "book-review", "retraction", "erratum"}:
+    if EXCLUDED.search(title) or NOTICE_SUFFIX.search(title) or subtype in {"editorial", "correction", "book-review", "retraction", "erratum", "corrigendum"}:
         return None, "excluded_article_kind"
     if raw.get("update-to"):
         return None, "update_notice"

@@ -189,6 +189,33 @@ class DateAndMetadataTests(unittest.TestCase):
                 self.assertIsNone(paper)
                 self.assertEqual(reason, expected)
 
+    def test_terminal_notice_labels_are_excluded(self):
+        for label in ("Correction", "CORRIGENDUM", "Erratum", "Retraction", "Retraction notice"):
+            for delimiter in (" – ", " — ", " - ", ": "):
+                with self.subTest(label=label, delimiter=delimiter):
+                    paper, reason = monitor.make_paper(raw_paper(title=["Synthetic banking study" + delimiter + label]), JOURNAL, ISSN, AT)
+                    self.assertIsNone(paper)
+                    self.assertEqual(reason, "excluded_article_kind")
+
+    def test_parenthesized_notice_labels_are_excluded(self):
+        for suffix in (" (Correction)", " [CORRIGENDUM]", " (Erratum).", " [Retraction notice]"):
+            with self.subTest(suffix=suffix):
+                self.assertEqual(monitor.make_paper(raw_paper(title=["Synthetic study" + suffix]), JOURNAL, ISSN, AT)[1], "excluded_article_kind")
+
+    def test_observed_corrigendum_title_shape_is_excluded(self):
+        # Synthetic wording preserves the observed terminal en-dash label.
+        raw = raw_paper(title=["Synthetic Resolution Design in Banking Groups – CORRIGENDUM"])
+        self.assertEqual(monitor.make_paper(raw, JOURNAL, ISSN, AT)[1], "excluded_article_kind")
+
+    def test_research_reviews_and_conceptual_titles_are_preserved(self):
+        for title in ("An integrative review and research agenda", "A systematic review of error correction",
+                      "A conceptual framework for organizational learning", "Learning from retraction notices",
+                      "Forecasting: error correction", "Reviewing strategic responses"):
+            with self.subTest(title=title):
+                paper, reason = monitor.make_paper(raw_paper(title=[title]), JOURNAL, ISSN, AT)
+                self.assertIsNone(reason)
+                self.assertIsNotNone(paper)
+
     def test_coarse_year_cannot_hide_definitely_old_online_publication(self):
         paper = self.make(raw_paper(publication=(2026, 1, 4), **{"published": {"date-parts": [[2026]]}}))
         self.assertEqual(monitor.eligibility(paper, dt.date(2026, 8, 31), dt.date(2026, 9, 30)),

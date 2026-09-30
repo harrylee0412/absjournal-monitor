@@ -12,7 +12,7 @@ This repository is a runtime component. It does not install a scheduler, provide
 - Online, print, generic publication, issued, DOI-created, and indexed dates remain separate. DOI registration is never called publication; year/month precision does not invent a day. A definitely old online date cannot be rescued by a newer print date
 - Outages are processed in bounded early windows with `caught_up=false` until current. Publication recency is evaluated relative to each catch-up window end
 - This is bounded recent-publication discovery, not an exhaustive census. Crossref may lack articles, abstracts, or dates. Deposits more than seven days late can be missed. Publisher scraping, RSS, paid enrichment, and full text are not implemented
-- Article-type/title heuristics exclude corrections, editorials, retraction notices, book reviews, and issue matter. This is not a complete publisher article-kind or retraction-status audit
+- Article-type/title heuristics exclude corrections, editorials, retraction notices, book reviews, and issue matter. Correction, corrigendum, erratum, and retraction labels at the end of a title are recognized when separated by a dash/colon or brackets; ordinary review, research, and conceptual titles remain eligible. This is not a complete publisher article-kind or retraction-status audit
 - All discovered titles receive Chinese translations. At most five abstract-backed daily papers, or eight weekly papers, receive detailed bilingual highlights. Missing abstracts retain fixed evidence-limit notices. Other papers appear in a compact bilingual title/DOI index
 - Summary quote, number, and obvious-direction checks are guardrails, not proof of semantic, bilingual, or causal fidelity. Source-based review remains necessary
 
