@@ -1,0 +1,16 @@
+# Local Python caches and private runtime artifacts
+__pycache__/
+*.py[cod]
+*.lock
+.venv/
+.env
+.env.*
+!.env.example
+private-run/
+state*.json
+*-state*.json
+*-batch.json
+*-summaries.json
+*-rendered/
+*-envelope.json
+validation.json

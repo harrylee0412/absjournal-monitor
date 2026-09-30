@@ -1,0 +1,19 @@
+{
+  "runtime_version": "1.1.0-public",
+  "schema_version": 1,
+  "created_at": "2026-09-30T06:37:26.098724+00:00",
+  "python_minimum": "3.11",
+  "dependencies": "standard library only",
+  "offline_test_count": 99,
+  "recipient_configuration": "explicit prepare-delivery --recipient or prepare_delivery(..., recipient=address)",
+  "files": {
+    ".gitignore": "67503ecaeb93be98ec35ff367bcec4c49f963af03e0c2b3c57982b436086121f",
+    "LUNA_PROMPT.md": "6cd9af65afaffbb9e0c51800668ae6c1606ad5ee99ca3d941e9d57acbdae2e55",
+    "README.md": "b526081a743ad3793f59005d6ccf703a5c46f70e077cd55741fb2b00f5440f43",
+    "VERIFICATION.md": "a9d5e724dcc243ad45d7b1313e4d4136e148a3a6a4725fe31698d724a89b4f61",
+    "journals.json": "f3f56f35450052ddba179ce15f29c677e64700b5274d732398a33c70af1c2662",
+    "journals_sources.md": "9119f748436cc6eee8c112d92de51232fb8ee7f991aa1a94800417f9bb1a6a00",
+    "monitor.py": "23c68010915a63cccd195e09a22261530df11dfee015b26e6e13cf81028fd488",
+    "tests/test_monitor.py": "bbcdcc2c97580067f8717182c1918f6dc9b7dcbbb5a544d9685b977e0a33143b"
+  }
+}

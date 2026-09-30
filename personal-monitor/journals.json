@@ -1,0 +1,795 @@
+{
+  "schema_version": 1,
+  "list_version": "2026",
+  "default_set": "focus16",
+  "journals": [
+    {
+      "id": "academy-of-management-annals",
+      "title": "Academy of Management Annals",
+      "issns": [
+        "1941-6520",
+        "1941-6067"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://www.aom.org/publications/journal-information/subscriptions-and-library-information/"
+      ]
+    },
+    {
+      "id": "academy-of-management-journal",
+      "title": "Academy of Management Journal",
+      "issns": [
+        "0001-4273",
+        "1948-0989"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php",
+        "https://www.aom.org/publications/journal-information/subscriptions-and-library-information/"
+      ]
+    },
+    {
+      "id": "academy-of-management-review",
+      "title": "Academy of Management Review",
+      "issns": [
+        "0363-7425",
+        "1930-3807"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php",
+        "https://www.aom.org/publications/journal-information/subscriptions-and-library-information/"
+      ]
+    },
+    {
+      "id": "the-accounting-review",
+      "title": "The Accounting Review",
+      "issns": [
+        "0001-4826",
+        "1558-7967"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "accounting-organizations-and-society",
+      "title": "Accounting, Organizations and Society",
+      "issns": [
+        "0361-3682",
+        "1873-6289"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://portal.issn.org/resource/issn/1873-6289"
+      ]
+    },
+    {
+      "id": "administrative-science-quarterly",
+      "title": "Administrative Science Quarterly",
+      "issns": [
+        "0001-8392",
+        "1930-3815"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "american-economic-review",
+      "title": "American Economic Review",
+      "issns": [
+        "0002-8282",
+        "1944-7981"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "american-sociological-review",
+      "title": "American Sociological Review",
+      "issns": [
+        "0003-1224",
+        "1939-8271"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "contemporary-accounting-research",
+      "title": "Contemporary Accounting Research",
+      "issns": [
+        "0823-9150",
+        "1911-3846"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "econometrica",
+      "title": "Econometrica",
+      "issns": [
+        "0012-9682",
+        "1468-0262"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "entrepreneurship-theory-and-practice",
+      "title": "Entrepreneurship Theory and Practice",
+      "issns": [
+        "1042-2587",
+        "1540-6520"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "harvard-business-review",
+      "title": "Harvard Business Review",
+      "issns": [
+        "0017-8012"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://portal.issn.org/resource/ISSN/0017-8012"
+      ]
+    },
+    {
+      "id": "human-resource-management",
+      "title": "Human Resource Management",
+      "issns": [
+        "0090-4848",
+        "1099-050X"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "information-systems-research",
+      "title": "Information Systems Research",
+      "issns": [
+        "1047-7047",
+        "1526-5536"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-accounting-and-economics",
+      "title": "Journal of Accounting and Economics",
+      "issns": [
+        "0165-4101",
+        "1879-1980"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php",
+        "https://portal.issn.org/resource/ISSN/1879-1980"
+      ]
+    },
+    {
+      "id": "journal-of-accounting-research",
+      "title": "Journal of Accounting Research",
+      "issns": [
+        "0021-8456",
+        "1475-679X"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-applied-psychology",
+      "title": "Journal of Applied Psychology",
+      "issns": [
+        "0021-9010",
+        "1939-1854"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-business-venturing",
+      "title": "Journal of Business Venturing",
+      "issns": [
+        "0883-9026",
+        "1873-2003"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://portal.issn.org/resource/ISSN/1873-2003"
+      ]
+    },
+    {
+      "id": "journal-of-consumer-psychology",
+      "title": "Journal of Consumer Psychology",
+      "issns": [
+        "1057-7408",
+        "1532-7663"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-consumer-research",
+      "title": "Journal of Consumer Research",
+      "issns": [
+        "0093-5301",
+        "1537-5277"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-finance",
+      "title": "Journal of Finance",
+      "issns": [
+        "0022-1082",
+        "1540-6261"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-financial-and-quantitative-analysis",
+      "title": "Journal of Financial and Quantitative Analysis",
+      "issns": [
+        "0022-1090",
+        "1756-6916"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-financial-economics",
+      "title": "Journal of Financial Economics",
+      "issns": [
+        "0304-405X",
+        "1879-2774"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php",
+        "https://portal.issn.org/resource/ISSN/1879-2774"
+      ]
+    },
+    {
+      "id": "journal-of-international-business-studies",
+      "title": "Journal of International Business Studies",
+      "issns": [
+        "0047-2506",
+        "1478-6990"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-management",
+      "title": "Journal of Management",
+      "issns": [
+        "0149-2063",
+        "1557-1211"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-management-information-systems",
+      "title": "Journal of Management Information Systems",
+      "issns": [
+        "0742-1222",
+        "1557-928X"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-management-studies",
+      "title": "Journal of Management Studies",
+      "issns": [
+        "0022-2380",
+        "1467-6486"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-marketing",
+      "title": "Journal of Marketing",
+      "issns": [
+        "0022-2429",
+        "1547-7185"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-marketing-research",
+      "title": "Journal of Marketing Research",
+      "issns": [
+        "0022-2437",
+        "1547-7193"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-operations-management",
+      "title": "Journal of Operations Management",
+      "issns": [
+        "0272-6963",
+        "1873-1317"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "journal-of-political-economy",
+      "title": "Journal of Political Economy",
+      "issns": [
+        "0022-3808",
+        "1537-534X"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "journal-of-the-academy-of-marketing-science",
+      "title": "Journal of the Academy of Marketing Science",
+      "issns": [
+        "0092-0703",
+        "1552-7824"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "management-science",
+      "title": "Management Science",
+      "issns": [
+        "0025-1909",
+        "1526-5501"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "manufacturing-and-service-operations-management",
+      "title": "Manufacturing & Service Operations Management",
+      "issns": [
+        "1523-4614",
+        "1526-5498"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "marketing-science",
+      "title": "Marketing Science",
+      "issns": [
+        "0732-2399",
+        "1526-548X"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "mis-quarterly",
+      "title": "MIS Quarterly",
+      "issns": [
+        "0276-7783",
+        "2162-9730"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "mit-sloan-management-review",
+      "title": "MIT Sloan Management Review",
+      "issns": [
+        "1532-9194",
+        "1532-8937"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://portal.issn.org/resource/ISSN/1532-8937",
+        "https://mitsloan.mit.edu/press/update-mit-sloan-management-review"
+      ]
+    },
+    {
+      "id": "operations-research",
+      "title": "Operations Research",
+      "issns": [
+        "0030-364X",
+        "1526-5463"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "organization-science",
+      "title": "Organization Science",
+      "issns": [
+        "1047-7039",
+        "1526-5455"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "organizational-behavior-and-human-decision-processes",
+      "title": "Organizational Behavior and Human Decision Processes",
+      "issns": [
+        "0749-5978",
+        "1095-9920"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "production-and-operations-management",
+      "title": "Production and Operations Management",
+      "issns": [
+        "1059-1478",
+        "1937-5956"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "psychological-science",
+      "title": "Psychological Science",
+      "issns": [
+        "0956-7976",
+        "1467-9280"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "the-quarterly-journal-of-economics",
+      "title": "The Quarterly Journal of Economics",
+      "issns": [
+        "0033-5533",
+        "1531-4650"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "the-review-of-economic-studies",
+      "title": "The Review of Economic Studies",
+      "issns": [
+        "0034-6527",
+        "1467-937X"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "research-policy",
+      "title": "Research Policy",
+      "issns": [
+        "0048-7333",
+        "1873-7625"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://portal.issn.org/resource/ISSN/1873-7625"
+      ]
+    },
+    {
+      "id": "review-of-accounting-studies",
+      "title": "Review of Accounting Studies",
+      "issns": [
+        "1380-6653",
+        "1573-7136"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "review-of-finance",
+      "title": "Review of Finance",
+      "issns": [
+        "1572-3097",
+        "1573-692X"
+      ],
+      "sets": [
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "the-review-of-financial-studies",
+      "title": "The Review of Financial Studies",
+      "issns": [
+        "0893-9454",
+        "1465-7368"
+      ],
+      "sets": [
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "strategic-entrepreneurship-journal",
+      "title": "Strategic Entrepreneurship Journal",
+      "issns": [
+        "1932-4391",
+        "1932-443X"
+      ],
+      "sets": [
+        "focus16",
+        "ft50"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and"
+      ]
+    },
+    {
+      "id": "strategic-management-journal",
+      "title": "Strategic Management Journal",
+      "issns": [
+        "0143-2095",
+        "1097-0266"
+      ],
+      "sets": [
+        "focus16",
+        "ft50",
+        "utd24"
+      ],
+      "source_urls": [
+        "https://library.smu.edu.sg/topics-insights/updating-your-ft50-search-strategies-verified-issns-literature-search-scopus-and",
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php"
+      ]
+    },
+    {
+      "id": "informs-journal-on-computing",
+      "title": "INFORMS Journal on Computing",
+      "issns": [
+        "1091-9856",
+        "1526-5528"
+      ],
+      "sets": [
+        "utd24"
+      ],
+      "source_urls": [
+        "https://jsom.utdallas.edu/the-utd-top-100-business-school-research-rankings/index.php",
+        "https://pubsonline.informs.org/journal/ijoc",
+        "https://pubsonline.informs.org/doi/pdf/10.1287/ijoc.2024.eb.v3605"
+      ]
+    }
+  ]
+}
